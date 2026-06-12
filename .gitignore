@@ -1,0 +1,23 @@
+## Build
+bin/
+obj/
+artifacts/
+publish/
+
+## IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Test / cobertura
+TestResults/
+coverage/
+
+## Chaves (nunca versionar)
+*.pem
+!tools/mock/*.pem.example

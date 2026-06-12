@@ -1,0 +1,16 @@
+---
+description: Convenções .NET para src/ e tests/ do jukebox-ota-agent.
+globs: "{src,tests}/**/*.{cs,csproj}"
+alwaysApply: false
+---
+
+# .NET — jukebox-ota-agent
+
+- Target: **net8.0**; publish Pi: `linux-arm64` self-contained.
+- Nullable reference types activos.
+- Camadas: `Domain` → `Application` → `Infrastructure` / `Interfaces`.
+- Interfaces de repositório/serviço no **Domain**; implementação na **Infrastructure**.
+- `Program.cs` apenas composição; sem regra de negócio.
+- Assinatura preferida: **RSA-PSS SHA-256** via `System.Security.Cryptography`.
+- JSON de config/manifesto: **snake_case** (`device_id`, `signature_b64`).
+- Testes xUnit para cada caso de uso novo ou alteração de verificação criptográfica.

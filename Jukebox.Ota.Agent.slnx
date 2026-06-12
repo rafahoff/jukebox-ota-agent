@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Jukebox.Ota.Agent/Jukebox.Ota.Agent.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Jukebox.Ota.Agent.Tests/Jukebox.Ota.Agent.Tests.csproj" />
+  </Folder>
+</Solution>

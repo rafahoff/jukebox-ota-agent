@@ -1,0 +1,7 @@
+{
+  "device_id": "machine-001",
+  "channel": "beta",
+  "ota_base_url": "file:///etc/jukebox/mock-manifest.json",
+  "current_version": "1.4.1",
+  "public_key_path": "/etc/jukebox/ota-public-key.pem"
+}

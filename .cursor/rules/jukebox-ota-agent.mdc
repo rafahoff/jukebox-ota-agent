@@ -1,0 +1,19 @@
+---
+description: Convenções do repositório jukebox-ota-agent para o agente Cursor.
+alwaysApply: true
+---
+
+# jukebox-ota-agent — contexto do agente
+
+- **Idioma**: respostas e comentários em código em **português do Brasil**.
+- **Escopo**: alterar só o necessário; POC OTA separada do kiosk Flutter.
+- **Manifesto**: ler `.cursor/knowledge.manifest.md` — produto (`jukeeo-knowledge`) → `docs/index.md` → notas linkadas.
+- **Planos**: criar em `docs/plans/`; concluídos em `docs/plans/archive/`. Brainstorm em `jukeeo-knowledge/docs/brainstorm/`.
+- **Obsidian**: vault pai `C:\GitHub\jukebox\`; wiki `[[NOME]]`; não duplicar notas entre repos.
+- **Runbook**: ler `.cursor/napkin.md` no início da sessão; skill `napkin`.
+- **Arquitetura**: skill `dotnet-architecting-apps`; testes `dotnet-testing-apps`.
+- **Scripts**: deploy em `tools/deploy/`; workarounds em `tools/`.
+- **Dependências NuGet**: não adicionar sem pedido explícito do usuário.
+- **Workspace**: `jukeeo.code-workspace` na pasta pai.
+- **Fronteiras**: sem lógica de kiosk/sync; sem swap de bundle até fase pós-POC.
+- **Commits**: formato `tipo(escopo): descrição` em português (feat, fix, test, docs, chore).

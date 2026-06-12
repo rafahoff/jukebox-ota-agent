@@ -1,0 +1,9 @@
+{
+  "app": "jukebox_tv",
+  "version": "1.4.2",
+  "arch": "aarch64",
+  "sha256": "substituir-pelo-hash-real",
+  "signature_b64": "",
+  "signature_algorithm": "rsa-pss-sha256",
+  "released_at": "2026-06-12T12:00:00Z"
+}

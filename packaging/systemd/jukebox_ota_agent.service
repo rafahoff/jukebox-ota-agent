@@ -1,0 +1,14 @@
+[Unit]
+Description=Jukebox OTA Agent — verificação de atualização
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/jukebox/ota-agent/jukebox-ota-agent check --config /etc/jukebox/ota-agent.json
+SyslogIdentifier=jukebox-ota
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
