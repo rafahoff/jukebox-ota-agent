@@ -21,10 +21,10 @@
 | Fase | Entrega | Critério de saída | Estado |
 |------|---------|-------------------|--------|
 | 0 | Scaffold .NET + `version`/`check` | Build e testes no Windows/WSL | **concluída** (bootstrap) |
-| 1 | Manifesto + `sha256` + RSA-PSS | Testes assinatura válida/inválida | em progresso |
+| 1 | Manifesto + `sha256` + RSA-PSS | Testes assinatura válida/inválida | **concluída** |
 | 2 | Publish `linux-arm64` self-contained | Artefato roda `version` no Pi | pendente |
 | 3 | systemd + journald | `SyslogIdentifier=jukebox-ota` | pendente |
-| 4 | `check` contra API mock HTTPS | Telemetria registada | pendente |
+| 4 | `check` contra API mock HTTPS | Telemetria registada | em progresso — mock HTTP: `tools/mock/ota_mock_server.py`, howto [[FASE4_MOCK_LAN]] |
 | 5 | Medições no Pi | Tamanho, RAM, startup documentados | pendente |
 
 ## CLI

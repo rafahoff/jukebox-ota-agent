@@ -1,0 +1,8 @@
+{
+  "_comment": "Substituir 192.168.15.XXX pelo IP LAN do PC Windows que corre o mock (tools/mock/ota_mock_server.py). No Pi: copiar para /etc/jukebox/ota-agent.json e ajustar device_id/public_key_path.",
+  "device_id": "machine-001",
+  "channel": "beta",
+  "ota_base_url": "http://192.168.15.XXX:8080",
+  "current_version": "1.4.1",
+  "public_key_path": "/etc/jukebox/ota-public-key.pem"
+}

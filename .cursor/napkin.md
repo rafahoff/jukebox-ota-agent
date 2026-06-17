@@ -19,6 +19,9 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 - [2026-06-12] **Mock OTA local**
   Faça assim: `ota_base_url` com `file://` + caminho absoluto do manifesto JSON; `check --config` retorna código `2` quando há versão mais nova.
 
+- [2026-06-17] **Mock OTA HTTP (LAN)**
+  Faça assim: no Windows, `python tools/mock/ota_mock_server.py --mode auto`; no Pi, `ota_base_url` `http://<IP-Windows>:8080` (modelo `tools/mock/ota-agent.pi-lan.example.json`). Ver `docs/howto/FASE4_MOCK_LAN.md`.
+
 ## Shell e confiabilidade
 
 - [2026-06-12] **CLI mínima**

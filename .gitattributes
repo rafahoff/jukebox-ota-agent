@@ -1,0 +1,2 @@
+# Scripts shell executados no Pi/WSL — sempre LF
+*.sh text eol=lf
