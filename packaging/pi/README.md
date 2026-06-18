@@ -28,10 +28,11 @@ Copiar e marcar após cada passo:
 
 - [ ] **F2** — Publish `linux-arm64` self-contained (`artifacts/linux-arm64/jukebox-ota-agent` existe)
 - [ ] **Deploy** — Staging enviado para `/tmp/jukebox-ota-staging/` no Pi
-- [ ] **F3** — Binário em `/opt/jukebox/ota-agent/` com `chmod +x`
+- [ ] **F3** — Binário em `/opt/jukebox/ota-agent/` (`root:jukebox-ota`, binário `750`)
+- [ ] **F3** — Utilizador `jukebox-ota` criado; service corre sem root
 - [ ] **F3** — Units em `/etc/systemd/system/jukebox_ota_agent.{service,timer}`
-- [ ] **Config** — `/etc/jukebox/ota-agent.json` criado (template em `tools/mock/ota-agent.example.json`)
-- [ ] **Validação** — `jukebox-ota-agent version` retorna versão
+- [ ] **Config** — `/etc/jukebox/ota-agent.json` criado (`640`, grupo `jukebox-ota`)
+- [ ] **Validação** — `sudo -u jukebox-ota …/jukebox-ota-agent version`
 - [ ] **Validação** — `check --config /etc/jukebox/ota-agent.json` (quando mock/API disponível)
 - [ ] **Opcional** — `systemctl enable --now jukebox_ota_agent.timer` (só com `--enable-timer` no install)
 - [ ] **Observabilidade** — `journalctl -t jukebox-ota -n 50` mostra execuções
@@ -62,7 +63,7 @@ Copiar e marcar após cada passo:
 ```bash
 ssh jukebox@192.168.15.100
 sudo bash /tmp/jukebox-ota-staging/pi_install_ota.sh --enable-timer
-/opt/jukebox/ota-agent/jukebox-ota-agent version
+sudo -u jukebox-ota /opt/jukebox/ota-agent/jukebox-ota-agent version
 sudo journalctl -t jukebox-ota -n 50 --no-pager
 ```
 

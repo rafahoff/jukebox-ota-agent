@@ -14,3 +14,4 @@ Planos **deste repositório**. Brainstorm de produto permanece em `jukeeo-knowle
 | Ficheiro | Tema |
 |----------|------|
 | [PLANO_POC_DOTNET_PI.md](PLANO_POC_DOTNET_PI.md) | POC .NET no Pi — fases 0–5 |
+| [PLANO_SEGURANCA_OTA_PENDENCIAS.md](PLANO_SEGURANCA_OTA_PENDENCIAS.md) | Pendências de segurança OTA — servidor, verify, chave pública |
