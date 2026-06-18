@@ -20,6 +20,7 @@ param(
 
 $ErrorActionPreference = "Continue"
 $BinaryPath = "$InstallDir/jukebox-ota-agent"
+$OtaUser = "jukebox-ota"
 $ServiceUnit = "jukebox_ota_agent.service"
 $TimerUnit = "jukebox_ota_agent.timer"
 
@@ -43,6 +44,11 @@ function Invoke-Ssh {
     ssh -o ConnectTimeout=10 -o BatchMode=yes "${PiUser}@${PiHost}" $Command 2>&1
 }
 
+function Invoke-SshAsOta {
+    param([string]$Command)
+    Invoke-Ssh "sudo -n -u ${OtaUser} bash -lc '$($Command -replace "'", "'\''")'"
+}
+
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Verificação OTA Agent — Pi" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
@@ -57,29 +63,34 @@ Add-Check -Name "SSH conectividade" -Pass $sshOk -Detail $(if ($sshOk) { "OK" } 
 if (-not $sshOk) {
     Write-Host "Falha SSH — demais checks ignorados." -ForegroundColor Red
 } else {
-    # 2. Binário existe
+    # 2. Utilizador de sistema dedicado
+    $otaUserOut = Invoke-Ssh "getent passwd ${OtaUser} >/dev/null && echo EXISTS || echo MISSING"
+    $otaUserOk = ($LASTEXITCODE -eq 0) -and ($otaUserOut -match "EXISTS")
+    Add-Check -Name "Utilizador de sistema ($OtaUser)" -Pass $otaUserOk -Detail $(if ($otaUserOk) { "presente" } else { "ausente — reexecute pi_install_ota.sh" })
+
+    # 3. Binário existe e é executável pelo utilizador OTA
     $binOut = Invoke-Ssh "test -x '$BinaryPath' && echo EXISTS || echo MISSING"
     $binOk = ($LASTEXITCODE -eq 0) -and ($binOut -match "EXISTS")
     Add-Check -Name "Binário instalado ($BinaryPath)" -Pass $binOk -Detail $(($binOut | Out-String).Trim())
 
-    # 3. version
-    if ($binOk) {
-        $verOut = Invoke-Ssh "'$BinaryPath' version"
+    # 4. version (como jukebox-ota, não root)
+    if ($binOk -and $otaUserOk) {
+        $verOut = Invoke-SshAsOta "$BinaryPath version"
         $verOk = $LASTEXITCODE -eq 0
         $verDetail = ($verOut | Out-String).Trim()
-        Add-Check -Name "jukebox-ota-agent version" -Pass $verOk -Detail $verDetail
+        Add-Check -Name "jukebox-ota-agent version (user=$OtaUser)" -Pass $verOk -Detail $verDetail
     } else {
-        Add-Check -Name "jukebox-ota-agent version" -Pass $false -Detail "binário ausente"
+        Add-Check -Name "jukebox-ota-agent version (user=$OtaUser)" -Pass $false -Detail "binário ou utilizador OTA ausente"
     }
 
-    # 4. Config existe
-    $cfgOut = Invoke-Ssh "test -f '$ConfigPath' && echo EXISTS || echo MISSING"
+    # 5. Config existe e é legível pelo utilizador OTA
+    $cfgOut = Invoke-Ssh "sudo -n -u ${OtaUser} test -r '$ConfigPath' && echo EXISTS || echo MISSING"
     $cfgExists = ($LASTEXITCODE -eq 0) -and ($cfgOut -match "EXISTS")
-    Add-Check -Name "Config ($ConfigPath)" -Pass $cfgExists -Detail $(if ($cfgExists) { "presente" } else { "ausente — execute pi_install_ota.sh ou crie manualmente" })
+    Add-Check -Name "Config ($ConfigPath)" -Pass $cfgExists -Detail $(if ($cfgExists) { "legível por $OtaUser" } else { "ausente ou sem permissão para $OtaUser" })
 
-    # 5. check --config (se config existir)
-    if ($cfgExists -and $binOk) {
-        $checkOut = Invoke-Ssh "'$BinaryPath' check --config '$ConfigPath'"
+    # 6. check --config (como jukebox-ota)
+    if ($cfgExists -and $binOk -and $otaUserOk) {
+        $checkOut = Invoke-SshAsOta "$BinaryPath check --config '$ConfigPath'"
         $checkOk = $LASTEXITCODE -eq 0
         $checkDetail = ($checkOut | Out-String).Trim()
         if ($checkDetail.Length -gt 200) {
@@ -90,8 +101,8 @@ if (-not $sshOk) {
         Add-Check -Name "check --config" -Pass $false -Detail "ignorado (config ou binário ausente)"
     }
 
-    # 6. MockBaseUrl opcional — check com config temporária apontando para o PC
-    if ($MockBaseUrl -and $binOk) {
+    # 7. MockBaseUrl opcional — check com config temporária apontando para o PC
+    if ($MockBaseUrl -and $binOk -and $otaUserOk) {
         $mockUrl = $MockBaseUrl.Trim()
         if ($mockUrl -notmatch "^https?://") {
             $mockUrl = "http://$mockUrl"
@@ -107,7 +118,8 @@ cat > /tmp/ota-agent-mock-verify.json <<'EOCFG'
   "public_key_path": "/etc/jukebox/ota-public-key.pem"
 }
 EOCFG
-'$BinaryPath' check --config /tmp/ota-agent-mock-verify.json; ec=`$?; rm -f /tmp/ota-agent-mock-verify.json; exit `$ec
+chmod 644 /tmp/ota-agent-mock-verify.json
+sudo -n -u ${OtaUser} '$BinaryPath' check --config /tmp/ota-agent-mock-verify.json; ec=`$?; rm -f /tmp/ota-agent-mock-verify.json; exit `$ec
 "@
         $mockOut = Invoke-Ssh $mockCmd
         $mockOk = $LASTEXITCODE -eq 0
@@ -118,16 +130,25 @@ EOCFG
         Add-Check -Name "check contra mock ($mockUrl)" -Pass $mockOk -Detail $mockDetail
     }
 
-    # 7. systemd units
+    # 8. systemd units e utilizador da service
     $svcOut = Invoke-Ssh "systemctl cat '$ServiceUnit' 2>/dev/null | head -1"
     $svcOk = $LASTEXITCODE -eq 0
     Add-Check -Name "Unit systemd ($ServiceUnit)" -Pass $svcOk -Detail $(if ($svcOk) { "instalada" } else { "não encontrada" })
+
+    if ($svcOk) {
+        $svcUserOut = Invoke-Ssh "systemctl show -p User --value '$ServiceUnit' 2>/dev/null"
+        $svcUser = ($svcUserOut | Out-String).Trim()
+        $svcUserOk = $svcUser -eq $OtaUser
+        Add-Check -Name "Service User=$OtaUser" -Pass $svcUserOk -Detail $(if ($svcUserOk) { "User=$svcUser" } else { "User=$svcUser (esperado: $OtaUser)" })
+    } else {
+        Add-Check -Name "Service User=$OtaUser" -Pass $false -Detail "unit não instalada"
+    }
 
     $timerOut = Invoke-Ssh "systemctl is-enabled '$TimerUnit' 2>/dev/null || echo disabled"
     $timerEnabled = ($timerOut | Out-String).Trim() -match "enabled"
     Add-Check -Name "Timer ($TimerUnit)" -Pass $true -Detail $(if ($timerEnabled) { "habilitado" } else { "não habilitado (esperado na POC sem --enable-timer)" })
 
-    # 8. journalctl (se service instalada)
+    # 9. journalctl (se service instalada)
     if ($svcOk) {
         $journalOut = Invoke-Ssh "journalctl -t jukebox-ota -n 20 --no-pager 2>/dev/null || echo '(sem entradas)'"
         $journalOk = $LASTEXITCODE -eq 0

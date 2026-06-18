@@ -39,8 +39,26 @@ Critério de saída F2: binário executa `version` no Pi.
 
 Units em `packaging/systemd/`:
 
-- `jukebox_ota_agent.service` — oneshot `check --config /etc/jukebox/ota-agent.json`
+- `jukebox_ota_agent.service` — oneshot `check` como utilizador **`jukebox-ota`** (não root)
 - `jukebox_ota_agent.timer` — `OnBootSec=5min`, `OnUnitActiveSec=6h`
+
+O `pi_install_ota.sh` cria o utilizador de sistema `jukebox-ota` e aplica permissões:
+
+| Caminho | Dono | Modo | Notas |
+|---------|------|------|-------|
+| `/opt/jukebox/ota-agent/` | `root:jukebox-ota` | dirs `750`, ficheiros `640`, binário `750` | Agente lê/executa; não grava |
+| `/etc/jukebox/` | `root:jukebox-ota` | `750` | Config e PEM legíveis pelo grupo |
+| `/etc/jukebox/ota-agent.json` | `root:jukebox-ota` | `640` | |
+| `/var/lib/jukebox-ota/` | `jukebox-ota:jukebox-ota` | `750` | Estado futuro (downloads) |
+
+Teste manual no Pi (requer `sudo`):
+
+```bash
+sudo -u jukebox-ota /opt/jukebox/ota-agent/jukebox-ota-agent version
+sudo systemctl start jukebox_ota_agent.service
+```
+
+O utilizador SSH `jukebox` **não** executa o binário directamente após o install — usar `sudo -u jukebox-ota` ou o timer systemd.
 
 O timer **não** é habilitado automaticamente; use `--enable-timer` no install ou `deploy_to_pi.ps1 -EnableTimer`.
 
@@ -88,10 +106,10 @@ sudo bash /tmp/jukebox-ota-staging/pi_install_ota.sh --force-config
 
 Ações:
 
-- Copia `artifacts/` → `/opt/jukebox/ota-agent/`
+- Cria utilizador de sistema `jukebox-ota` (sem login)
+- Copia `artifacts/` → `/opt/jukebox/ota-agent/` com permissões `root:jukebox-ota`
 - Copia units → `/etc/systemd/system/`
-- Cria `/etc/jukebox/ota-agent.json` do template se não existir
-- `chmod +x` no binário
+- Cria `/etc/jukebox/ota-agent.json` do template se não existir (`640`)
 - `systemctl daemon-reload`
 - Timer só com `--enable-timer`
 
@@ -125,12 +143,13 @@ Checks executados via SSH:
 | Check | Critério |
 |-------|----------|
 | SSH | Conectividade |
+| Utilizador OTA | `jukebox-ota` existe (`getent passwd`) |
 | Binário | `/opt/jukebox/ota-agent/jukebox-ota-agent` executável |
-| `version` | Exit 0 + versão impressa |
-| Config | `/etc/jukebox/ota-agent.json` existe |
-| `check --config` | Exit 0 (se config presente) |
+| `version` | Exit 0 como `sudo -u jukebox-ota` |
+| Config | `/etc/jukebox/ota-agent.json` legível por `jukebox-ota` |
+| `check --config` | Exit 0 como `jukebox-ota` (se config presente) |
 | Mock opcional | `check` com URL temporária (`-MockBaseUrl`) |
-| systemd | Unit instalada; estado do timer |
+| systemd | Unit instalada; `User=jukebox-ota` na service |
 | journald | `journalctl -t jukebox-ota -n 20` |
 
 Exit code: `0` se todos passarem; `1` se algum falhar.

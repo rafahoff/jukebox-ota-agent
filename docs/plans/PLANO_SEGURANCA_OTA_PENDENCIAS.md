@@ -148,11 +148,22 @@ Num quiosque com root comprometido, **nenhuma verificação só-cliente é absol
 
 #### 3.4.1 Privilégio mínimo (prioridade alta, baixo custo)
 
-- [ ] Criar utilizador de sistema dedicado (ex.: `jukebox-ota`) sem shell de login.
-- [ ] Unit systemd: `User=jukebox-ota`, `Group=jukebox-ota`.
-- [ ] PEM e `ota-agent.json` com dono `root`, grupo `jukebox-ota`, modo `640`; diretórios `750`.
-- [ ] Binário em `/opt/jukebox/ota-agent/` legível e executável pelo grupo; **não** gravável pelo agente.
-- [ ] Agente **não** precisa de root para `check`/`verify`; root só no script de **install** (deploy).
+- [x] Criar utilizador de sistema dedicado (`jukebox-ota`) sem shell de login — `pi_install_ota.sh`.
+- [x] Unit systemd: `User=jukebox-ota`, `Group=jukebox-ota` — `packaging/systemd/jukebox_ota_agent.service`.
+- [x] PEM e `ota-agent.json` com dono `root`, grupo `jukebox-ota`, modo `640`; `/etc/jukebox` modo `750`.
+- [x] Binário em `/opt/jukebox/ota-agent/` legível/executável pelo grupo; **não** gravável pelo agente.
+- [x] Estado futuro em `/var/lib/jukebox-ota` (`StateDirectory` + `750` no install).
+- [x] Agente **não** precisa de root para `check`/`verify`; root só no script de **install** (deploy).
+
+**Validação manual no Pi** (utilizador `jukebox` com sudo):
+
+```bash
+sudo -u jukebox-ota /opt/jukebox/ota-agent/jukebox-ota-agent version
+sudo systemctl start jukebox_ota_agent.service
+journalctl -t jukebox-ota -n 20 --no-pager
+```
+
+O utilizador `jukebox` **não** consegue executar o binário nem ler a config directamente (`750`/`640`); precisa de `sudo -u jukebox-ota` ou do timer systemd.
 
 Isto não impede root, mas impede o processo **normal** do kiosk e scripts do utilizador `jukebox` de trocar a chave sem escalar.
 
@@ -213,7 +224,7 @@ Mesmo com chave pública trocada localmente, um atacante precisa de um **pacote 
 
 - [ ] Assinatura RSA-PSS obrigatória (`signature_b64` não vazio)
 - [ ] `verify` integrado no fluxo de download antes do swap
-- [ ] Utilizador de sistema dedicado (não root)
+- [x] Utilizador de sistema dedicado (não root) — `jukebox-ota` + unit systemd
 - [ ] Fingerprint da chave embutido no build + validação em runtime
 - [ ] Avaliar certificate pinning em `ota_base_url`
 - [ ] Telemetria de falhas de verificação e mismatch de fingerprint
@@ -230,7 +241,7 @@ Mesmo com chave pública trocada localmente, um atacante precisa de um **pacote 
 ## 5. Próximos passos sugeridos
 
 1. **Decisão de produto** no `jukebox-ota-server`: modelo de autorização de download (ver §1.2).
-2. **Quick win no agente:** utilizador `jukebox-ota` + unit systemd sem root; documentar em `packaging/pi/README.md`.
+2. ~~**Quick win no agente:** utilizador `jukebox-ota` + unit systemd sem root~~ — **feito** (ver §3.4.1).
 3. **Código:** flag ou compilação `Release` que rejeita manifesto sem assinatura.
 4. **Código:** `PublicKeyTrustAnchor` — fingerprint embutido + validação ao carregar PEM.
 5. **ADR** em `docs/adr/` quando a decisão de ancora de confiança estiver fechada.
@@ -244,6 +255,7 @@ Mesmo com chave pública trocada localmente, um atacante precisa de um **pacote 
 | `src/Jukebox.Ota.Agent/Infrastructure/Security/RsaPssPackageVerifier.cs` | SHA-256 + RSA-PSS |
 | `src/Jukebox.Ota.Agent/Infrastructure/ExternalServices/HttpOtaUpdateClient.cs` | Cliente HTTP sem auth |
 | `tools/mock/ota_mock_server.py` | Mock sem autorização |
-| `packaging/systemd/jukebox_ota_agent.service` | Execução oneshot (privilégio a rever) |
+| `packaging/systemd/jukebox_ota_agent.service` | Execução oneshot como `jukebox-ota` |
+| `tools/deploy/pi_install_ota.sh` | Cria utilizador de sistema e permissões mínimas |
 | `.cursor/skills/insecure-defaults/SKILL.md` | Checklist de defaults |
 | `docs/API.md` | Contrato `/v1/updates/check` |

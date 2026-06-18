@@ -5,10 +5,19 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=jukebox-ota
+Group=jukebox-ota
 ExecStart=/opt/jukebox/ota-agent/jukebox-ota-agent check --config /etc/jukebox/ota-agent.json
 SyslogIdentifier=jukebox-ota
 StandardOutput=journal
 StandardError=journal
+
+# Privilégio mínimo — ver docs/plans/PLANO_SEGURANCA_OTA_PENDENCIAS.md §3.4.1
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+StateDirectory=jukebox-ota
 
 [Install]
 WantedBy=multi-user.target

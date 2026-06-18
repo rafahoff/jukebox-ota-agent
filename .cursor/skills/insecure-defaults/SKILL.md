@@ -14,7 +14,8 @@ description: >-
 - [ ] Manifesto sem `signature_b64` só aceito na POC — exigir assinatura em produção
 - [ ] `ota_base_url` usa HTTPS em produção (não `file://`)
 - [ ] Não desactivar verificação TLS (`HttpClient` padrão mantém validação de certificado)
-- [ ] Permissões de `/etc/jukebox/ota-agent.json` restritas (root/leitura agente)
+- [ ] Permissões de `/etc/jukebox/ota-agent.json` restritas (`root:jukebox-ota`, `640`)
+- [ ] Service systemd com `User=jukebox-ota` (não root)
 
 ## Código sensível
 

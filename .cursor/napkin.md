@@ -37,6 +37,9 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 
 ## Segurança
 
+- [2026-06-18] **Execução sem root**
+  Faça assim: timer/service com `User=jukebox-ota`; install via `pi_install_ota.sh` (root só no deploy); testar com `sudo -u jukebox-ota …/jukebox-ota-agent version`.
+
 - [2026-06-18] **Chave pública no Pi**
   Faça assim: chave pública **não é segredo** — o risco é troca do PEM ou do binário com root; ver [[PLANO_SEGURANCA_OTA_PENDENCIAS]] §3 (user dedicado, fingerprint embutido, RO rootfs).
 
