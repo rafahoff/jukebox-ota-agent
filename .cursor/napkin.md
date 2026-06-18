@@ -72,6 +72,9 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 - [2026-06-18] **Timer no install**
   Faça assim: `pi_install_ota.sh --enable-timer` habilita `jukebox_ota_agent.timer` (não `.time`).
 
+- [2026-06-18] **Timer habilitado no Pi (JUK-69)**
+  Faça assim: após JUK-67/JUK-68, `.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer` (executar na raiz do repo — `powershell -File` aninhado pode falhar parse). Validar: `systemctl is-enabled jukebox_ota_agent.timer` → `enabled`; `systemctl list-timers jukebox_ota_agent.timer`; `systemctl start jukebox_ota_agent.service` → `Result=success` com `ExecMainStatus=2` (update disponível, não failed).
+
 - [2026-06-18] **sudoers + nome da unit**
   Faça assim: `kiosk_service_name` e comandos `systemctl` devem usar sufixo `.service` — o fragmento sudoers lista paths literais; o agente normaliza automaticamente desde 2026-06-18.
 

@@ -191,7 +191,7 @@ Exit code: `0` se todos passarem; `1` se algum falhar.
 - [ ] Install F3 OK (`version` no Pi)
 - [ ] Config JSON presente
 - [ ] `check` contra mock/API (F4)
-- [ ] Timer habilitado (se desejado)
+- [x] Timer habilitado (`-EnableTimer` / `--enable-timer`) — validado 2026-06-18 em `192.168.15.100` (JUK-69)
 - [ ] Logs em journald
 
 ## WSL vs scp
