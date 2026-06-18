@@ -24,14 +24,7 @@ public sealed class JsonManifestLoader
         var dto = JsonSerializer.Deserialize<UpdateManifestDto>(json, Options)
             ?? throw new InvalidOperationException("Manifesto OTA inválido ou vazio.");
 
-        return new UpdateManifest(
-            dto.App ?? "jukebox_tv",
-            dto.Version ?? throw new InvalidOperationException("version é obrigatória."),
-            dto.Arch ?? "aarch64",
-            dto.Sha256 ?? throw new InvalidOperationException("sha256 é obrigatório."),
-            dto.SignatureB64 ?? string.Empty,
-            dto.SignatureAlgorithm ?? "rsa-pss-sha256",
-            dto.ReleasedAt ?? DateTimeOffset.UtcNow);
+        return MapDto(dto);
     }
 
     internal static UpdateManifest FromJson(string json)
@@ -39,15 +32,19 @@ public sealed class JsonManifestLoader
         var dto = JsonSerializer.Deserialize<UpdateManifestDto>(json, Options)
             ?? throw new InvalidOperationException("Manifesto OTA inválido ou vazio.");
 
-        return new UpdateManifest(
-            dto.App ?? "jukebox_tv",
+        return MapDto(dto);
+    }
+
+    private static UpdateManifest MapDto(UpdateManifestDto dto) =>
+        new(
+            dto.App ?? "jukeeo",
             dto.Version ?? throw new InvalidOperationException("version é obrigatória."),
             dto.Arch ?? "aarch64",
             dto.Sha256 ?? throw new InvalidOperationException("sha256 é obrigatório."),
             dto.SignatureB64 ?? string.Empty,
             dto.SignatureAlgorithm ?? "rsa-pss-sha256",
-            dto.ReleasedAt ?? DateTimeOffset.UtcNow);
-    }
+            dto.ReleasedAt ?? DateTimeOffset.UtcNow,
+            dto.PackageType ?? "full");
 
     private sealed class UpdateManifestDto
     {
@@ -71,5 +68,8 @@ public sealed class JsonManifestLoader
 
         [JsonPropertyName("released_at")]
         public DateTimeOffset? ReleasedAt { get; set; }
+
+        [JsonPropertyName("package_type")]
+        public string? PackageType { get; set; }
     }
 }

@@ -1,7 +1,8 @@
 {
-  "app": "jukebox_tv",
+  "app": "jukeeo",
   "version": "1.4.2",
   "arch": "aarch64",
+  "package_type": "full",
   "sha256": "substituir-pelo-hash-real",
   "signature_b64": "",
   "signature_algorithm": "rsa-pss-sha256",

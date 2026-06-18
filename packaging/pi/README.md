@@ -28,12 +28,15 @@ Copiar e marcar após cada passo:
 
 - [ ] **F2** — Publish `linux-arm64` self-contained (`artifacts/linux-arm64/jukebox-ota-agent` existe)
 - [ ] **Deploy** — Staging enviado para `/tmp/jukebox-ota-staging/` no Pi
-- [ ] **F3** — Binário em `/opt/jukebox/ota-agent/` (`root:jukebox-ota`, binário `750`)
+- [ ] **F3** — Binário em `/opt/jukeeo/ota-agent/` (`root:jukebox-ota`, binário `750`)
 - [ ] **F3** — Utilizador `jukebox-ota` criado; service corre sem root
 - [ ] **F3** — Units em `/etc/systemd/system/jukebox_ota_agent.{service,timer}`
-- [ ] **Config** — `/etc/jukebox/ota-agent.json` criado (`640`, grupo `jukebox-ota`)
+- [ ] **sudoers** — `/etc/sudoers.d/99-jukebox-ota-systemctl` + `systemctl is-active` como `jukebox-ota`
+- [ ] **Config** — `/etc/jukeeo/ota-agent.json` criado (`640`, grupo `jukebox-ota`) com `kiosk_service_name` em `.service`
+- [ ] **ACL backup** — `jukebox-ota` consegue traverse em `/home/jukebox` e ler `kiosk_data_dir`
 - [ ] **Validação** — `sudo -u jukebox-ota …/jukebox-ota-agent version`
-- [ ] **Validação** — `check --config /etc/jukebox/ota-agent.json` (quando mock/API disponível)
+- [ ] **Validação** — `check --config /etc/jukeeo/ota-agent.json` (exit `0` ou `2`; quando mock/API disponível)
+- [ ] **systemd** — `sudo systemctl start jukebox_ota_agent.service` com update pendente → `Result=success` (não `failed`)
 - [ ] **Opcional** — `systemctl enable --now jukebox_ota_agent.timer` (só com `--enable-timer` no install)
 - [ ] **Observabilidade** — `journalctl -t jukebox-ota -n 50` mostra execuções
 
@@ -63,7 +66,8 @@ Copiar e marcar após cada passo:
 ```bash
 ssh jukebox@192.168.15.100
 sudo bash /tmp/jukebox-ota-staging/pi_install_ota.sh --enable-timer
-sudo -u jukebox-ota /opt/jukebox/ota-agent/jukebox-ota-agent version
+sudo -u jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent version
+sudo -u jukebox-ota sudo -n /bin/systemctl is-active jukeeo_kiosk_flutterpi.service
 sudo journalctl -t jukebox-ota -n 50 --no-pager
 ```
 

@@ -66,6 +66,7 @@ public sealed class RsaPssPackageVerifier : IPackageVerifier
             app = manifest.App,
             version = manifest.Version,
             arch = manifest.Arch,
+            package_type = manifest.PackageType,
             sha256 = manifest.Sha256.ToLowerInvariant(),
             signature_algorithm = manifest.SignatureAlgorithm,
             released_at = manifest.ReleasedAt.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),

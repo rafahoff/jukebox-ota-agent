@@ -12,7 +12,7 @@ param(
 
     [string]$PiUser = "jukebox",
 
-    [string]$RemotePath = "/opt/jukebox/ota-agent",
+    [string]$RemotePath = "/opt/jukeeo/ota-agent",
 
     [string]$RemoteStaging = "/tmp/jukebox-ota-staging",
 
@@ -34,6 +34,20 @@ $PublishScript = Join-Path $DeployDir "publish-linux-arm64.ps1"
 $RsyncScript = Join-Path $DeployDir "deploy_to_pi_rsync.sh"
 $InstallScript = Join-Path $DeployDir "pi_install_ota.sh"
 $BinaryName = "jukebox-ota-agent"
+
+function Set-UnixLineEndings {
+    param([string[]]$Paths)
+
+    foreach ($path in $Paths) {
+        if (-not (Test-Path $path)) { continue }
+        $text = [System.IO.File]::ReadAllText($path)
+        $normalized = $text -replace "`r`n", "`n" -replace "`r", "`n"
+        if ($normalized -ne $text) {
+            $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+            [System.IO.File]::WriteAllText($path, $normalized, $utf8NoBom)
+        }
+    }
+}
 
 function ToWslPath {
     param([string]$WinPath)
@@ -108,16 +122,26 @@ New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
 $stagingArtifacts = Join-Path $StagingDir "artifacts"
 $stagingSystemd = Join-Path $StagingDir "systemd"
 $stagingConfig = Join-Path $StagingDir "config"
+$stagingSudoers = Join-Path $StagingDir "sudoers"
 
 New-Item -ItemType Directory -Path $stagingArtifacts -Force | Out-Null
 New-Item -ItemType Directory -Path $stagingSystemd -Force | Out-Null
+New-Item -ItemType Directory -Path $stagingSudoers -Force | Out-Null
 
 Copy-Item -Recurse -Force "$ArtifactsDir\*" $stagingArtifacts
 Copy-Item -Force (Join-Path $Root "packaging\systemd\jukebox_ota_agent.service") $stagingSystemd
 Copy-Item -Force (Join-Path $Root "packaging\systemd\jukebox_ota_agent.timer") $stagingSystemd
 New-Item -ItemType Directory -Path $stagingConfig -Force | Out-Null
 Copy-Item -Force (Join-Path $Root "tools\mock\ota-agent.example.json") (Join-Path $stagingConfig "ota-agent.example.json")
+Copy-Item -Force (Join-Path $Root "packaging\sudoers\jukebox-ota-systemctl.template") (Join-Path $stagingSudoers "jukebox-ota-systemctl.template")
 Copy-Item -Force $InstallScript (Join-Path $StagingDir "pi_install_ota.sh")
+
+Set-UnixLineEndings @(
+    $RsyncScript
+    $InstallScript
+    (Join-Path $StagingDir "pi_install_ota.sh")
+    (Join-Path $stagingSudoers "jukebox-ota-systemctl.template")
+)
 
 # --- Enviar para o Pi ---
 $useWsl = Test-WslAvailable

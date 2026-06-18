@@ -1,2 +1,3 @@
 # Scripts shell executados no Pi/WSL — sempre LF
 *.sh text eol=lf
+packaging/sudoers/* text eol=lf

@@ -7,7 +7,9 @@ Wants=network-online.target
 Type=oneshot
 User=jukebox-ota
 Group=jukebox-ota
-ExecStart=/opt/jukebox/ota-agent/jukebox-ota-agent check --config /etc/jukebox/ota-agent.json
+ExecStart=/opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json
+# POC: exit 2 = update disponível (não é falha); exit 1 = erro real
+SuccessExitStatus=0 2
 SyslogIdentifier=jukebox-ota
 StandardOutput=journal
 StandardError=journal

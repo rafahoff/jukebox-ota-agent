@@ -14,6 +14,8 @@ Ponto de entrada para agentes neste repositório.
 |------|------|
 | [[PLANO_POC_DOTNET_PI]] | POC .NET no Raspberry Pi (fases 0–5) |
 | [[PLANO_SEGURANCA_OTA_PENDENCIAS]] | Pendências de segurança — servidor, verify, chave pública no Pi |
+| `jukebox_tv/docs/plans/PLANO_OTA_EXECUCAO_PI.md` | Execução OTA: `/opt/jukeeo`, apply, GC, ack ([[PLANO_OTA_EXECUCAO_PI]]) |
+| `docs/API.md` | Contrato HTTP (`jukeeo`, ack completo) |
 | `docs/howto/DEPLOY_PI.md` | Deploy self-contained no Pi |
 | `packaging/pi/README.md` | Checklist systemd |
 

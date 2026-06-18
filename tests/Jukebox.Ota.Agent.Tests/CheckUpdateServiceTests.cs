@@ -15,7 +15,7 @@ public class CheckUpdateServiceTests
 
         File.WriteAllText(manifestPath, """
             {
-              "app": "jukebox_tv",
+              "app": "jukeeo",
               "version": "1.4.2",
               "arch": "aarch64",
               "sha256": "abc123",

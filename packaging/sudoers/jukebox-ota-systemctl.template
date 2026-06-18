@@ -1,0 +1,5 @@
+# Gerido por pi_install_ota.sh — não editar à mão no Pi.
+# Permite ao utilizador jukebox-ota parar/iniciar o kiosk para apply OTA (sem password).
+Defaults:jukebox-ota !requiretty
+Cmnd_Alias JUKEEO_KIOSK_SYSTEMCTL = /bin/systemctl start @KIOSK_SERVICE@, /bin/systemctl stop @KIOSK_SERVICE@, /bin/systemctl restart @KIOSK_SERVICE@, /bin/systemctl is-active @KIOSK_SERVICE@
+jukebox-ota ALL=(root) NOPASSWD: JUKEEO_KIOSK_SYSTEMCTL

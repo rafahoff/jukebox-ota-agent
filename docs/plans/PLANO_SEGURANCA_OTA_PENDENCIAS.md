@@ -150,15 +150,19 @@ Num quiosque com root comprometido, **nenhuma verificação só-cliente é absol
 
 - [x] Criar utilizador de sistema dedicado (`jukebox-ota`) sem shell de login — `pi_install_ota.sh`.
 - [x] Unit systemd: `User=jukebox-ota`, `Group=jukebox-ota` — `packaging/systemd/jukebox_ota_agent.service`.
-- [x] PEM e `ota-agent.json` com dono `root`, grupo `jukebox-ota`, modo `640`; `/etc/jukebox` modo `750`.
-- [x] Binário em `/opt/jukebox/ota-agent/` legível/executável pelo grupo; **não** gravável pelo agente.
+- [x] PEM e `ota-agent.json` com dono `root`, grupo `jukebox-ota`, modo `640`; `/etc/jukeeo` modo `750`.
+- [x] Binário em `/opt/jukeeo/ota-agent/` legível/executável pelo grupo; **não** gravável pelo agente.
 - [x] Estado futuro em `/var/lib/jukebox-ota` (`StateDirectory` + `750` no install).
 - [x] Agente **não** precisa de root para `check`/`verify`; root só no script de **install** (deploy).
+- [x] **sudoers restrito** para `apply`: `jukebox-ota` pode `systemctl start|stop|restart|is-active` apenas em `jukeeo_kiosk_flutterpi.service` — `packaging/sudoers/` + `pi_install_ota.sh`.
+- [x] Permissões em `/opt/jukeeo/{releases,backups,ota}` para o grupo `jukebox-ota` gravar durante `apply`.
+- [x] ACL de leitura nos dados do kiosk para backup no `apply` (`setfacl` no install).
 
 **Validação manual no Pi** (utilizador `jukebox` com sudo):
 
 ```bash
-sudo -u jukebox-ota /opt/jukebox/ota-agent/jukebox-ota-agent version
+sudo -u jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent version
+sudo -u jukebox-ota sudo -n /bin/systemctl is-active jukeeo_kiosk_flutterpi.service
 sudo systemctl start jukebox_ota_agent.service
 journalctl -t jukebox-ota -n 20 --no-pager
 ```

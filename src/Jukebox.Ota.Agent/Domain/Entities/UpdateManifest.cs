@@ -8,5 +8,6 @@ public sealed record UpdateManifest(
     string Sha256,
     string SignatureB64,
     string SignatureAlgorithm,
-    DateTimeOffset ReleasedAt
+    DateTimeOffset ReleasedAt,
+    string PackageType = "full"
 );

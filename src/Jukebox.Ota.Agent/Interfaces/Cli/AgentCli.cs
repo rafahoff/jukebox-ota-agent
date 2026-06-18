@@ -7,15 +7,21 @@ public sealed class AgentCli
     private readonly VersionService _versionService;
     private readonly CheckUpdateService _checkService;
     private readonly VerifyPackageService _verifyService;
+    private readonly SignManifestService _signManifestService;
+    private readonly ApplyUpdateService _applyService;
 
     public AgentCli(
         VersionService versionService,
         CheckUpdateService checkService,
-        VerifyPackageService verifyService)
+        VerifyPackageService verifyService,
+        SignManifestService signManifestService,
+        ApplyUpdateService applyService)
     {
         _versionService = versionService;
         _checkService = checkService;
         _verifyService = verifyService;
+        _signManifestService = signManifestService;
+        _applyService = applyService;
     }
 
     public async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
@@ -31,6 +37,8 @@ public sealed class AgentCli
             "version" => RunVersion(),
             "check" => await RunCheckAsync(args, cancellationToken),
             "verify" => await RunVerifyAsync(args, cancellationToken),
+            "sign-manifest" => await RunSignManifestAsync(args, cancellationToken),
+            "apply" => await RunApplyAsync(args, cancellationToken),
             "-h" or "--help" or "help" => RunHelp(),
             _ => UnknownCommand(args[0]),
         };
@@ -61,6 +69,28 @@ public sealed class AgentCli
         return await _verifyService.RunAsync(manifestPath, packagePath, publicKeyPath, cancellationToken);
     }
 
+    private async Task<int> RunSignManifestAsync(string[] args, CancellationToken cancellationToken)
+    {
+        var manifestPath = GetOptionValue(args, "--manifest")
+            ?? throw new ArgumentException("sign-manifest requer --manifest <caminho>.");
+        var privateKeyPath = GetOptionValue(args, "--private-key")
+            ?? throw new ArgumentException("sign-manifest requer --private-key <caminho>.");
+        var outputPath = GetOptionValue(args, "--output");
+
+        return await _signManifestService.RunAsync(manifestPath, privateKeyPath, outputPath, cancellationToken);
+    }
+
+    private async Task<int> RunApplyAsync(string[] args, CancellationToken cancellationToken)
+    {
+        var configPath = GetOptionValue(args, "--config")
+            ?? throw new ArgumentException("apply requer --config <caminho>.");
+        var manifestPath = GetOptionValue(args, "--manifest")
+            ?? throw new ArgumentException("apply requer --manifest <caminho>.");
+        var packagePath = GetOptionValue(args, "--package");
+
+        return await _applyService.RunAsync(configPath, manifestPath, packagePath, cancellationToken);
+    }
+
     private static int RunHelp()
     {
         PrintUsage();
@@ -77,12 +107,14 @@ public sealed class AgentCli
     private static void PrintUsage()
     {
         Console.WriteLine("""
-            jukebox-ota-agent — agente OTA Jukebox (POC .NET)
+            jukebox-ota-agent — agente OTA Jukeeo (POC .NET)
 
             Uso:
               jukebox-ota-agent version
               jukebox-ota-agent check --config <arquivo.json>
               jukebox-ota-agent verify --manifest <manifest.json> --package <arquivo> [--public-key <chave.pem>]
+              jukebox-ota-agent sign-manifest --manifest <in.json> --private-key <pem> [--output <out.json>]
+              jukebox-ota-agent apply --config <json> --manifest <json> [--package <path>]
             """);
     }
 

@@ -13,9 +13,15 @@ param(
 
     [string]$MockBaseUrl = "",
 
-    [string]$InstallDir = "/opt/jukebox/ota-agent",
+    [string]$InstallDir = "/opt/jukeeo/ota-agent",
 
-    [string]$ConfigPath = "/etc/jukebox/ota-agent.json"
+    [string]$ConfigPath = "/etc/jukeeo/ota-agent.json",
+
+    [string]$KioskService = "jukeeo_kiosk_flutterpi.service",
+
+    [string]$KioskDataDir = "/home/jukebox/.local/share/com.jukeeo.kiosk",
+
+    [string]$KioskUser = "jukebox"
 )
 
 $ErrorActionPreference = "Continue"
@@ -69,7 +75,7 @@ if (-not $sshOk) {
     Add-Check -Name "Utilizador de sistema ($OtaUser)" -Pass $otaUserOk -Detail $(if ($otaUserOk) { "presente" } else { "ausente — reexecute pi_install_ota.sh" })
 
     # 3. Binário existe e é executável pelo utilizador OTA
-    $binOut = Invoke-Ssh "test -x '$BinaryPath' && echo EXISTS || echo MISSING"
+    $binOut = Invoke-Ssh "sudo -n -u ${OtaUser} test -x '$BinaryPath' && echo EXISTS || echo MISSING"
     $binOk = ($LASTEXITCODE -eq 0) -and ($binOut -match "EXISTS")
     Add-Check -Name "Binário instalado ($BinaryPath)" -Pass $binOk -Detail $(($binOut | Out-String).Trim())
 
@@ -88,10 +94,52 @@ if (-not $sshOk) {
     $cfgExists = ($LASTEXITCODE -eq 0) -and ($cfgOut -match "EXISTS")
     Add-Check -Name "Config ($ConfigPath)" -Pass $cfgExists -Detail $(if ($cfgExists) { "legível por $OtaUser" } else { "ausente ou sem permissão para $OtaUser" })
 
+    # 5b. kiosk_service_name no JSON com sufixo .service (sudoers exige path literal)
+    if ($cfgExists) {
+        $svcNameCmd = @"
+sudo -n -u ${OtaUser} python3 -c "import json; c=json.load(open('$ConfigPath')); print(c.get('kiosk_service_name',''))"
+"@
+        $svcNameOut = Invoke-Ssh $svcNameCmd
+        $svcName = ($svcNameOut | Out-String).Trim()
+        $svcNameOk = ($LASTEXITCODE -eq 0) -and ($svcName -match '\.service$')
+        $svcDetail = if ($svcNameOk) { $svcName } else { "valor='$svcName' (esperado sufixo .service)" }
+        Add-Check -Name "kiosk_service_name (.service)" -Pass $svcNameOk -Detail $svcDetail
+    } else {
+        Add-Check -Name "kiosk_service_name (.service)" -Pass $false -Detail "config ausente"
+    }
+
+    # 5c. ACL traverse + leitura em kiosk_data_dir (backup SQLite no apply)
+    if ($cfgExists -and $otaUserOk) {
+        $aclCmd = @"
+DATA='$KioskDataDir'
+for p in /home/${KioskUser} /home/${KioskUser}/.local /home/${KioskUser}/.local/share; do
+  if [ -d "`$p" ]; then
+    sudo -n -u ${OtaUser} test -x "`$p" || { echo "TRAVERSE_FAIL:`$p"; exit 1; }
+  fi
+done
+if [ ! -d "`$DATA" ]; then
+  echo "NO_DATA_DIR"
+  exit 0
+fi
+sudo -n -u ${OtaUser} test -r "`$DATA" && echo READ_OK || { echo "READ_FAIL"; exit 1; }
+"@
+        $aclOut = Invoke-Ssh $aclCmd
+        $aclText = ($aclOut | Out-String).Trim()
+        if ($aclText -match "NO_DATA_DIR") {
+            Add-Check -Name "ACL backup kiosk_data_dir" -Pass $true -Detail "dados do kiosk ausentes ($KioskDataDir) — reexecute install após primeiro run do kiosk"
+        } elseif ($LASTEXITCODE -eq 0 -and $aclText -match "READ_OK") {
+            Add-Check -Name "ACL backup kiosk_data_dir" -Pass $true -Detail "traverse + leitura OK em $KioskDataDir"
+        } else {
+            Add-Check -Name "ACL backup kiosk_data_dir" -Pass $false -Detail $aclText
+        }
+    } else {
+        Add-Check -Name "ACL backup kiosk_data_dir" -Pass $false -Detail "ignorado (config ou utilizador OTA ausente)"
+    }
+
     # 6. check --config (como jukebox-ota)
     if ($cfgExists -and $binOk -and $otaUserOk) {
         $checkOut = Invoke-SshAsOta "$BinaryPath check --config '$ConfigPath'"
-        $checkOk = $LASTEXITCODE -eq 0
+        $checkOk = $LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2
         $checkDetail = ($checkOut | Out-String).Trim()
         if ($checkDetail.Length -gt 200) {
             $checkDetail = $checkDetail.Substring(0, 200) + "..."
@@ -115,7 +163,7 @@ cat > /tmp/ota-agent-mock-verify.json <<'EOCFG'
   "channel": "beta",
   "ota_base_url": "$mockUrl",
   "current_version": "0.0.0",
-  "public_key_path": "/etc/jukebox/ota-public-key.pem"
+  "public_key_path": "/etc/jukeeo/ota-public-key.pem"
 }
 EOCFG
 chmod 644 /tmp/ota-agent-mock-verify.json
@@ -148,7 +196,22 @@ sudo -n -u ${OtaUser} '$BinaryPath' check --config /tmp/ota-agent-mock-verify.js
     $timerEnabled = ($timerOut | Out-String).Trim() -match "enabled"
     Add-Check -Name "Timer ($TimerUnit)" -Pass $true -Detail $(if ($timerEnabled) { "habilitado" } else { "não habilitado (esperado na POC sem --enable-timer)" })
 
-    # 9. journalctl (se service instalada)
+    # 9. sudoers — systemctl do kiosk sem password
+    $sudoersPath = "/etc/sudoers.d/99-jukebox-ota-systemctl"
+    $sudoersOut = Invoke-Ssh "test -f '$sudoersPath' && echo EXISTS || echo MISSING"
+    $sudoersExists = ($LASTEXITCODE -eq 0) -and ($sudoersOut -match "EXISTS")
+    Add-Check -Name "sudoers ($sudoersPath)" -Pass $sudoersExists -Detail $(if ($sudoersExists) { "presente" } else { "ausente — reexecute pi_install_ota.sh" })
+
+    if ($sudoersExists -and $otaUserOk) {
+        $sysctlOut = Invoke-Ssh "sudo -n -u ${OtaUser} sudo -n /bin/systemctl is-active '$KioskService' 2>&1"
+        $sysctlOk = $LASTEXITCODE -eq 0
+        $sysctlDetail = ($sysctlOut | Out-String).Trim()
+        Add-Check -Name "systemctl kiosk (sudo -n como $OtaUser)" -Pass $sysctlOk -Detail $sysctlDetail
+    } else {
+        Add-Check -Name "systemctl kiosk (sudo -n como $OtaUser)" -Pass $false -Detail "ignorado (sudoers ou utilizador OTA ausente)"
+    }
+
+    # 10. journalctl (se service instalada)
     if ($svcOk) {
         $journalOut = Invoke-Ssh "journalctl -t jukebox-ota -n 20 --no-pager 2>/dev/null || echo '(sem entradas)'"
         $journalOk = $LASTEXITCODE -eq 0

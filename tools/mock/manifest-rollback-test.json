@@ -1,0 +1,10 @@
+{
+  "app": "jukeeo",
+  "version": "9.9.9",
+  "arch": "aarch64",
+  "package_type": "full",
+  "sha256": "53981c3179f44848e1d2b08a6257b9b701a1de819de99eb87b08d1e5d717ec08",
+  "signature_b64": "R+0zqN/DDwlL45mzDoaQDbL2lpF0tsCcK0zMq6IM+oen50EObOw0ir+fMGd4knoDgFmvUftEw4tIEWwYZPfOxqeZtFhJqpKLuh0e1w3sHCB8hqReX6Sp37LAM0JPjCE/9y3fTpNohgRMR3BsEa1IbBPFLiR4F1/qJ8kKrUbfTlhktPd65scuCoJDcEh89cSBAs+mWEKBsJM6+No4/4BCnD/1JATYHcQOIaCstfE52wDip5sfbM0CYC7ga3mHQgyNItI47LyCbpVWqK/dSLZ1ehBwfflxGj07388LkpaStFr5Kw7CVZb8GpXelPeirNp3TOqbKoZ9+NcY37rh1f9BMQ==",
+  "signature_algorithm": "rsa-pss-sha256",
+  "released_at": "2026-06-18T20:00:00+00:00"
+}

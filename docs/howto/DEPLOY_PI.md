@@ -13,7 +13,7 @@ Guia operacional para Fases 2–3 da POC: publish self-contained, deploy Windows
 [Windows]  deploy_to_pi.ps1  →  rsync/scp  →  /tmp/jukebox-ota-staging/ (Pi)
      │
      ▼
-[Pi]       pi_install_ota.sh  →  /opt/jukebox/ota-agent/ + systemd + config
+[Pi]       pi_install_ota.sh  →  /opt/jukeeo/ota-agent/ + systemd + sudoers + config
      │
      ▼
 [Windows]  verify_pi_from_windows.ps1  →  checklist pass/fail
@@ -46,15 +46,18 @@ O `pi_install_ota.sh` cria o utilizador de sistema `jukebox-ota` e aplica permis
 
 | Caminho | Dono | Modo | Notas |
 |---------|------|------|-------|
-| `/opt/jukebox/ota-agent/` | `root:jukebox-ota` | dirs `750`, ficheiros `640`, binário `750` | Agente lê/executa; não grava |
-| `/etc/jukebox/` | `root:jukebox-ota` | `750` | Config e PEM legíveis pelo grupo |
-| `/etc/jukebox/ota-agent.json` | `root:jukebox-ota` | `640` | |
+| `/opt/jukeeo/ota-agent/` | `root:jukebox-ota` | dirs `750`, ficheiros `640`, binário `750` | Agente lê/executa; não grava |
+| `/etc/jukeeo/` | `root:jukebox-ota` | `750` | Config e PEM legíveis pelo grupo |
+| `/etc/jukeeo/ota-agent.json` | `root:jukebox-ota` | `640` | |
+| `/opt/jukeeo/releases`, `backups`, `ota/*` | `root:jukebox-ota` | `2775` (setgid) | Apply grava releases/backups |
+| `/etc/sudoers.d/99-jukebox-ota-systemctl` | `root` | `440` | `systemctl` do kiosk sem password |
 | `/var/lib/jukebox-ota/` | `jukebox-ota:jukebox-ota` | `750` | Estado futuro (downloads) |
 
 Teste manual no Pi (requer `sudo`):
 
 ```bash
-sudo -u jukebox-ota /opt/jukebox/ota-agent/jukebox-ota-agent version
+sudo -u jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent version
+sudo -u jukebox-ota sudo -n /bin/systemctl is-active jukeeo_kiosk_flutterpi.service
 sudo systemctl start jukebox_ota_agent.service
 ```
 
@@ -72,17 +75,17 @@ Identificador journald: `jukebox-ota` (`SyslogIdentifier` na unit).
 |-----------|--------|-----------|
 | `-PiHost` | `192.168.15.100` | IP do Raspberry Pi |
 | `-PiUser` | `jukebox` | Utilizador SSH |
-| `-RemotePath` | `/opt/jukebox/ota-agent` | Destino final do binário |
+| `-RemotePath` | `/opt/jukeeo/ota-agent` | Destino final do binário |
 | `-RemoteStaging` | `/tmp/jukebox-ota-staging` | Staging temporário no Pi |
 | `-SkipPublish` | — | Não chama publish se artifact ausente (falha) |
 | `-SkipInstall` | — | Só envia staging; install manual no Pi |
 | `-EnableTimer` | — | Passa `--enable-timer` ao install |
-| `-ForceConfig` | — | Sobrescreve `/etc/jukebox/ota-agent.json` |
+| `-ForceConfig` | — | Sobrescreve `/etc/jukeeo/ota-agent.json` |
 
 Fluxo interno:
 
 1. Verifica `artifacts/linux-arm64/jukebox-ota-agent` (publica se ausente)
-2. Monta staging local com artifacts + systemd + template de config + `pi_install_ota.sh`
+2. Monta staging local com artifacts + systemd + sudoers + template de config + `pi_install_ota.sh`
 3. Envia via **WSL rsync** (preferido) ou **scp** (fallback)
 4. SSH: `sudo bash pi_install_ota.sh`
 
@@ -107,11 +110,32 @@ sudo bash /tmp/jukebox-ota-staging/pi_install_ota.sh --force-config
 Ações:
 
 - Cria utilizador de sistema `jukebox-ota` (sem login)
-- Copia `artifacts/` → `/opt/jukebox/ota-agent/` com permissões `root:jukebox-ota`
+- Copia `artifacts/` → `/opt/jukeeo/ota-agent/` com permissões `root:jukebox-ota`
+- Cria `/opt/jukeeo/{releases,backups,ota/*}` graváveis pelo grupo `jukebox-ota`
+- Instala `/etc/sudoers.d/99-jukebox-ota-systemctl` (systemctl do kiosk sem password)
+- ACL de leitura nos dados do kiosk (`/home/jukebox/.local/share/com.jukeeo.kiosk`)
+- Traverse ACL em `/home/jukebox`, `.local` e `.local/share` (pacote `acl` instalado se ausente)
+- Normaliza `kiosk_service_name` (sufixo `.service`) e `kiosk_data_dir` (`~` → path absoluto do utilizador kiosk)
 - Copia units → `/etc/systemd/system/`
-- Cria `/etc/jukebox/ota-agent.json` do template se não existir (`640`)
+- Cria `/etc/jukeeo/ota-agent.json` do template se não existir (`640`)
 - `systemctl daemon-reload`
 - Timer só com `--enable-timer`
+
+### sudoers (apply OTA)
+
+O `apply` para/inicia o kiosk via `systemctl`. Como o agente corre como `jukebox-ota` (não root), o install grava um fragmento sudoers restrito:
+
+- Ficheiro: `/etc/sudoers.d/99-jukebox-ota-systemctl` (template em `packaging/sudoers/`)
+- Comandos permitidos: `start`, `stop`, `restart`, `is-active` **apenas** em `jukeeo_kiosk_flutterpi.service`
+- O binário invoca `sudo -n /bin/systemctl …` quando o euid ≠ 0
+
+Validar após install:
+
+```bash
+sudo -u jukebox-ota sudo -n /bin/systemctl is-active jukeeo_kiosk_flutterpi.service
+```
+
+**Nota:** a unit `jukebox_ota_agent.service` mantém `NoNewPrivileges=yes` (só `check`). O `apply` deve correr via CLI como `jukebox-ota` (não através da unit de check).
 
 ## Configuração
 
@@ -121,9 +145,11 @@ Modelo: `tools/mock/ota-agent.example.json`
 {
   "device_id": "machine-001",
   "channel": "beta",
-  "ota_base_url": "file:///etc/jukebox/mock-manifest.json",
+  "ota_base_url": "file:///etc/jukeeo/mock-manifest.json",
   "current_version": "1.4.1",
-  "public_key_path": "/etc/jukebox/ota-public-key.pem"
+  "public_key_path": "/etc/jukeeo/ota-public-key.pem",
+  "kiosk_service_name": "jukeeo_kiosk_flutterpi.service",
+  "kiosk_data_dir": "/home/jukebox/.local/share/com.jukeeo.kiosk"
 }
 ```
 
@@ -144,10 +170,14 @@ Checks executados via SSH:
 |-------|----------|
 | SSH | Conectividade |
 | Utilizador OTA | `jukebox-ota` existe (`getent passwd`) |
-| Binário | `/opt/jukebox/ota-agent/jukebox-ota-agent` executável |
+| Binário | `/opt/jukeeo/ota-agent/jukebox-ota-agent` executável |
 | `version` | Exit 0 como `sudo -u jukebox-ota` |
-| Config | `/etc/jukebox/ota-agent.json` legível por `jukebox-ota` |
-| `check --config` | Exit 0 como `jukebox-ota` (se config presente) |
+| Config | `/etc/jukeeo/ota-agent.json` legível por `jukebox-ota` |
+| `kiosk_service_name` | Valor no JSON termina em `.service` (alinha com sudoers) |
+| ACL backup | Traverse em `/home/jukebox` + leitura em `kiosk_data_dir` como `jukebox-ota` |
+| sudoers | `/etc/sudoers.d/99-jukebox-ota-systemctl` + `systemctl is-active` como `jukebox-ota` |
+| `check --config` | Exit `0` (sem update) ou `2` (update disponível) como `jukebox-ota` |
+| systemd service | `SuccessExitStatus=0 2` — `systemctl start` não marca failed com update pendente |
 | Mock opcional | `check` com URL temporária (`-MockBaseUrl`) |
 | systemd | Unit instalada; `User=jukebox-ota` na service |
 | journald | `journalctl -t jukebox-ota -n 20` |

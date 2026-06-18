@@ -60,6 +60,27 @@ class OtaMockHandler(BaseHTTPRequestHandler):
             flush=True,
         )
 
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path != "/v1/updates/ack":
+            self.send_error(404, "Rota não encontrada")
+            self._log_response(404)
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length) if length > 0 else b""
+        try:
+            payload = json.loads(body.decode("utf-8")) if body else {}
+        except json.JSONDecodeError:
+            self.send_error(400, "JSON inválido")
+            self._log_response(400)
+            return
+
+        print(f"ACK recebido: {json.dumps(payload, ensure_ascii=False)}", flush=True)
+        self.send_response(204)
+        self.end_headers()
+        self._log_response(204)
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path != "/v1/updates/check":
