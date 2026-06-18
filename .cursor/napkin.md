@@ -37,5 +37,8 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 
 ## Segurança
 
+- [2026-06-18] **Chave pública no Pi**
+  Faça assim: chave pública **não é segredo** — o risco é troca do PEM ou do binário com root; ver [[PLANO_SEGURANCA_OTA_PENDENCIAS]] §3 (user dedicado, fingerprint embutido, RO rootfs).
+
 - [2026-06-12] **Chaves PEM**
   Faça assim: chave privada **nunca** no Pi; só `public_key_path` em `/etc/jukebox/`; não versionar `*.pem` (ver `.gitignore`).

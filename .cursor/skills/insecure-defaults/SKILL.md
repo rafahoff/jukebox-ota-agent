@@ -23,4 +23,5 @@ description: >-
 
 ## Referência
 
-[[PLANO_OTA_RASPBERRY_PI_SERVIDOR_PROPRIO]] § proteção de download
+- [[PLANO_OTA_RASPBERRY_PI_SERVIDOR_PROPRIO]] § proteção de download
+- [[PLANO_SEGURANCA_OTA_PENDENCIAS]] — pendências detalhadas (servidor, verify, chave pública / root)

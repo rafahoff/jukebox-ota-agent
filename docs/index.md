@@ -13,6 +13,7 @@ Ponto de entrada para agentes neste repositório.
 | Nota | Tema |
 |------|------|
 | [[PLANO_POC_DOTNET_PI]] | POC .NET no Raspberry Pi (fases 0–5) |
+| [[PLANO_SEGURANCA_OTA_PENDENCIAS]] | Pendências de segurança — servidor, verify, chave pública no Pi |
 | `docs/howto/DEPLOY_PI.md` | Deploy self-contained no Pi |
 | `packaging/pi/README.md` | Checklist systemd |
 
