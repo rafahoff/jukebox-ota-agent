@@ -10,6 +10,9 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 
 ## Execução e validação (prioridade máxima)
 
+- [2026-06-18] **Decisão §7 — manter .NET (JUK-70)**
+  Faça assim: POC fechada; linguagem definitiva .NET 8; critérios §7 OK (78 MiB, pico ~45 MiB, idle 0, startup <1s). Documentar em `docs/plans/PLANO_POC_DOTNET_PI.md` — não reavaliar Go salvo regressão material.
+
 - [2026-06-12] **Build e testes locais**
   Faça assim: `dotnet build` e `dotnet test` na raiz antes de publicar para o Pi.
 

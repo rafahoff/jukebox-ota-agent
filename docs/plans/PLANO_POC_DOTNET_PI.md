@@ -1,6 +1,6 @@
 # Plano — POC `jukebox-ota-agent` em .NET no Raspberry Pi
 
-- **Status:** Fase 5 concluída (JUK-67); decisão formal §7 pendente (JUK-70)
+- **Status:** POC concluída (fases 0–5); decisão §7 **manter .NET** (JUK-70, 2026-06-18)
 - **Data:** 2026-06-12
 - **Escopo:** validar agente .NET self-contained no Pi antes de swap real de bundles.
 
@@ -55,8 +55,6 @@
 | Assinatura sem dependência nativa problemática | RSA-PSS `System.Security.Cryptography` (JUK-63) | **OK** |
 | Deploy `linux-arm64` reproduzível | `publish-linux-arm64.ps1` + CI local (JUK-64) | **OK** |
 
-**Conclusão:** todos os critérios §7 satisfeitos — **manter .NET** como linguagem do `jukebox-ota-agent`. Reavaliar Go apenas se custo operacional mudar (ex.: artefacto &gt;200 MiB ou pico RAM &gt;150 MiB em cenários futuros com download/apply).
-
 ### Comandos de reprodução
 
 Ver `.cursor/napkin.md` (secção medições Pi).
@@ -77,6 +75,21 @@ jukebox-ota-agent apply --config ota-agent.json --manifest manifest.json --packa
 - Rollback automático
 - Parar/iniciar `jukebox_tv_flutterpi.service` ou sync agent
 
-## Critérios para manter .NET
+## Decisão §7 — manter .NET
 
-Ver [[PLANO_JUKEBOX_OTA_AGENT_DOTNET_POC]] §7. Reavaliar Go se dois ou mais critérios falharem sem correção simples.
+**Data:** 2026-06-18 · **Issue:** [JUK-70](https://linear.app/jukeeo/issue/JUK-70)
+
+**Decisão:** manter **.NET 8** como linguagem do `jukebox-ota-agent`. POC fases 0–4 validadas (incl. rollback 4.4, JUK-68 systemd); medições Fase 5 (JUK-67) satisfazem todos os critérios de [[PLANO_JUKEBOX_OTA_AGENT_DOTNET_POC]] §7.
+
+| Critério §7 | Evidência | Resultado |
+|-------------|-----------|-----------|
+| Artefacto self-contained aceitável | 78 MiB em SD 29 GiB | **OK** |
+| RAM idle não compete com kiosk | 0 residente; pico &lt;50 MiB em `check` | **OK** |
+| Startup rápido (timer/oneshot) | &lt;1 s em `check` completo | **OK** |
+| systemd/journald sem wrappers frágeis | Fase 3 + JUK-68 | **OK** |
+| Assinatura sem dependência nativa problemática | RSA-PSS `System.Security.Cryptography` | **OK** |
+| Deploy `linux-arm64` reproduzível | `publish-linux-arm64.ps1` + deploy Pi | **OK** |
+
+**Rationale:** seis critérios satisfeitos; custo operacional no Pi (78 MiB, pico ~45 MiB, idle 0) está dentro das margens do kiosk. **Não reavaliar Go** salvo regressão material (ex.: artefacto &gt;200 MiB ou pico RAM &gt;150 MiB em cenários futuros com download/apply).
+
+**Próximo backlog OTA:** fleet ([JUK-71](https://linear.app/jukeeo/issue/JUK-71), [JUK-72](https://linear.app/jukeeo/issue/JUK-72)); endurecimento segurança pós-piloto.
