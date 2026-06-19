@@ -2,6 +2,7 @@ using Jukebox.Ota.Agent.Application.Services;
 using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
+using Jukebox.Ota.Agent.Infrastructure.Policy;
 using Jukebox.Ota.Agent.Infrastructure.Telemetry;
 
 namespace Jukebox.Ota.Agent.Tests;
@@ -13,6 +14,8 @@ public class CheckUpdateServiceTests
     {
         var manifestPath = Path.Combine(Path.GetTempPath(), $"ota-manifest-{Guid.NewGuid():N}.json");
         var configPath = Path.Combine(Path.GetTempPath(), $"ota-config-{Guid.NewGuid():N}.json");
+        var kioskData = Path.Combine(Path.GetTempPath(), $"ota-kiosk-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(kioskData);
 
         File.WriteAllText(manifestPath, """
             {
@@ -33,7 +36,8 @@ public class CheckUpdateServiceTests
               "channel": "beta",
               "ota_base_url": "{{fileUrl}}",
               "current_version": "1.4.1",
-              "public_key_path": ""
+              "public_key_path": "",
+              "kiosk_data_dir": "{{kioskData.Replace("\\", "\\\\")}}"
             }
             """);
 
@@ -45,16 +49,26 @@ public class CheckUpdateServiceTests
                 client,
                 new ConsoleTelemetryReporter(),
                 new AlwaysAllowPolicyProvider(),
-                new NoOpCheckStateStore());
+                new FileOtaUpdateStatusStore());
 
             var exitCode = await service.RunAsync(configPath);
 
             Assert.Equal(2, exitCode);
+
+            var statusStore = new FileOtaUpdateStatusStore();
+            var config = new JsonConfigLoader().Load(configPath);
+            var status = statusStore.Read(config);
+            Assert.True(status.UpdateAvailable);
+            Assert.Equal("1.4.2", status.RemoteVersion);
         }
         finally
         {
             File.Delete(manifestPath);
             File.Delete(configPath);
+            if (Directory.Exists(kioskData))
+            {
+                Directory.Delete(kioskData, recursive: true);
+            }
         }
     }
 
@@ -62,14 +76,5 @@ public class CheckUpdateServiceTests
     {
         public OtaCheckPolicy GetPolicy(Domain.ValueObjects.OtaAgentConfig config) =>
             OtaCheckPolicy.Default with { IntervalMinutes = 15 };
-    }
-
-    private sealed class NoOpCheckStateStore : Domain.Services.IOtaCheckStateStore
-    {
-        public DateTimeOffset? GetLastCheckAt(string stateDirectory) => null;
-
-        public void SetLastCheckAt(string stateDirectory, DateTimeOffset timestamp)
-        {
-        }
     }
 }

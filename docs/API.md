@@ -90,11 +90,66 @@ Configurar `ota_base_url` como `file:///caminho/absoluto/manifest.json` em `/etc
 
 ```text
 jukebox-ota-agent version
-jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json
+jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json [--force]
+jukebox-ota-agent upgrade --config /etc/jukeeo/ota-agent.json [--force]
 jukebox-ota-agent verify --manifest <manifest.json> --package <arquivo.tar.zst> [--public-key <chave.pem>]
 jukebox-ota-agent sign-manifest --manifest <in.json> --private-key <pem> [--output <out.json>]
-jukebox-ota-agent apply --config <json> --manifest <json> [--package <path>]
+jukebox-ota-agent apply --config <json> --manifest <json> [--package <path>] [--force]
 ```
+
+### Estado partilhado (`ota_update_status.json`)
+
+Ficheiro legível pelo kiosk Flutter no diretório de dados persistentes:
+
+| Aspecto | Valor |
+|---------|-------|
+| Caminho | `{kiosk_data_dir}/ota_update_status.json` |
+| Escritor | Agente OTA (único) |
+| Leitor | Kiosk Flutter (Pi) |
+| Persistência | Write atómico (ficheiro `.tmp` + `rename`) |
+
+**Schema v1** (`schema_version: 1`):
+
+```json
+{
+  "schema_version": 1,
+  "phase": "update_available",
+  "checked_at_ms": 1718812800000,
+  "current_version": "1.4.1",
+  "remote_version": "1.4.2",
+  "update_available": true,
+  "error_message": null
+}
+```
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `phase` | string | `idle` \| `checking` \| `update_available` \| `downloading` \| `applying` \| `error` |
+| `checked_at_ms` | int \| null | Epoch ms da última verificação HTTP concluída (com ou sem update) |
+| `current_version` | string | Versão instalada no momento da escrita |
+| `remote_version` | string \| null | Versão oferecida pelo servidor |
+| `update_available` | bool | `true` quando há pacote mais recente elegível |
+| `error_message` | string \| null | Mensagem legível quando `phase=error` |
+
+**Migração:** `checked_at_ms` no JSON **substitui** o ficheiro legado `last_check_at_ms` em `state_directory`. Na primeira execução após deploy, se existir `last_check_at_ms` e `checked_at_ms` estiver ausente, o agente copia o valor (one-shot).
+
+### `--force`
+
+Em `check`, `upgrade` ou `apply`, ignora:
+
+- intervalo mínimo (`checked_at_ms`);
+- janela horária (`ota_check_window_start` / `ota_check_window_end`);
+- `ota_check_enabled=false` em `machine_config`.
+
+O toggle «Verificar atualizações automaticamente» no kiosk afecta apenas o timer systemd; não impede disparo manual com `--force`.
+
+### `upgrade`
+
+Orquestração: `check` (forçado se `--force`) → download do pacote → `apply` → actualiza JSON em cada fase.
+
+- Download via `download_url` no manifesto ou path derivado (`file://` fixture ou `{ota_base_url}/ota/{app}/{version}/{arch}/jukeeo-{version}+{arch}.tar.zst`).
+- Pacotes descarregados em `{state_directory}/downloads/`.
+- Exit **0** sucesso · **1** erro · **2** não aplicável (herdado do check quando há update mas apply falha retorna **1**).
 
 ### `sign-manifest`
 
@@ -135,7 +190,7 @@ Fluxo mínimo para piloto:
 | `health_url` | `http://127.0.0.1:8080/api/health` | |
 | `kiosk_data_dir` | `~/.local/share/com.jukeeo.kiosk` | Backup pré-update |
 | `max_release_folders` | `7` | GC releases e backups |
-| `state_directory` | `/var/lib/jukebox-ota` | Estado do agente (`last_check_at_ms`) |
+| `state_directory` | `/var/lib/jukebox-ota` | Downloads OTA (`downloads/`) e estado legado (`last_check_at_ms`, **deprecado**) |
 
 ### Política OTA (`machine_config` no SQLite do kiosk)
 
@@ -156,16 +211,20 @@ Se o SQLite estiver ausente ou a leitura falhar, usam-se os defaults (check habi
 1. Carregar política (SQLite ou defaults).
 2. Se `ota_check_enabled=false` → log + telemetria `check_skipped` → **exit 0**.
 3. Se fora da janela horária (hora local) → skip → **exit 0**.
-4. Se `now - last_check < interval_minutes` → skip → **exit 0** (`last_check_at_ms` em `state_directory`).
-5. Senão executar verificação HTTP; em sucesso (com ou sem update) actualizar `last_check_at_ms`.
+4. Se `now - checked_at_ms < interval_minutes` → skip → **exit 0** (`ota_update_status.json` em `kiosk_data_dir`).
+5. Senão executar verificação HTTP; em sucesso (com ou sem update) actualizar `checked_at_ms` no JSON.
+
+Com `--force`, os passos 2–4 são ignorados.
 
 Exit **2** mantém-se quando há update disponível. Falhas reais → exit **1**.
 
 ### Comportamento `apply`
 
-- Exige `ota_check_enabled=true` **e** estar dentro da janela horária.
-- **Não** exige intervalo mínimo (apply manual ou orquestrado ignora `last_check_at`).
-- Fora da janela ou OTA desabilitado → **exit 1**, mensagem clara, **sem** `POST /v1/updates/ack` (nenhuma tentativa de swap).
+- Exige `ota_check_enabled=true` **e** estar dentro da janela horária (salvo `--force`).
+- **Não** exige intervalo mínimo.
+- Com `--force`, ignora política de janela e `ota_check_enabled`.
+- Após sucesso, actualiza `ota_update_status.json`: `phase=idle`, `update_available=false`, `current_version` = versão aplicada.
+- Fora da janela ou OTA desabilitado (sem `--force`) → **exit 1**, mensagem clara, **sem** `POST /v1/updates/ack`.
 
 ## Layout no Pi (referência)
 

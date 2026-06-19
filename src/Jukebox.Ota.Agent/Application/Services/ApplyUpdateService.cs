@@ -1,6 +1,7 @@
 using Jukebox.Ota.Agent.Domain.Entities;
 using Jukebox.Ota.Agent.Domain.Repositories;
 using Jukebox.Ota.Agent.Domain.Services;
+using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.Logging;
 using Jukebox.Ota.Agent.Infrastructure.Manifest;
@@ -21,6 +22,7 @@ public sealed class ApplyUpdateService
     private readonly IHealthChecker _healthChecker;
     private readonly IOtaAckClient _ackClient;
     private readonly IOtaPolicyProvider _policyProvider;
+    private readonly IOtaUpdateStatusStore _statusStore;
 
     public ApplyUpdateService(
         JsonConfigLoader configLoader,
@@ -31,7 +33,8 @@ public sealed class ApplyUpdateService
         IBackupService backupService,
         IHealthChecker healthChecker,
         IOtaAckClient ackClient,
-        IOtaPolicyProvider policyProvider)
+        IOtaPolicyProvider policyProvider,
+        IOtaUpdateStatusStore statusStore)
     {
         _configLoader = configLoader;
         _manifestLoader = manifestLoader;
@@ -42,39 +45,56 @@ public sealed class ApplyUpdateService
         _healthChecker = healthChecker;
         _ackClient = ackClient;
         _policyProvider = policyProvider;
+        _statusStore = statusStore;
     }
 
     public async Task<int> RunAsync(
         string configPath,
         string manifestPath,
         string? packagePath,
+        bool force = false,
         CancellationToken cancellationToken = default)
     {
         var config = _configLoader.Load(configPath);
         var manifest = _manifestLoader.Load(manifestPath);
         var versionPrevious = _releaseManager.GetCurrentReleaseVersion(config) ?? config.CurrentVersion;
 
-        var policy = _policyProvider.GetPolicy(config);
-        var nowLocal = TimeOnly.FromDateTime(DateTime.Now);
-        if (!policy.Enabled)
+        WriteStatus(config, status => status with
         {
-            Console.Error.WriteLine("Apply recusado: verificação OTA desabilitada (ota_check_enabled=false).");
-            FileAgentLogger.LogApply("recusado: verificação OTA desabilitada (ota_check_enabled=false).");
-            return 1;
-        }
+            Phase = OtaUpdatePhases.Applying,
+            CurrentVersion = config.CurrentVersion,
+            RemoteVersion = manifest.Version,
+            UpdateAvailable = true,
+            ErrorMessage = null,
+        });
 
-        if (!OtaCheckSchedule.IsWithinWindow(nowLocal, policy.WindowStart, policy.WindowEnd))
+        if (!force)
         {
-            Console.Error.WriteLine(
-                $"Apply recusado: fora da janela de manutenção OTA ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
-            FileAgentLogger.LogApply(
-                $"recusado: fora da janela de manutenção OTA ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
-            return 1;
+            var policy = _policyProvider.GetPolicy(config);
+            var nowLocal = TimeOnly.FromDateTime(DateTime.Now);
+            if (!policy.Enabled)
+            {
+                Console.Error.WriteLine("Apply recusado: verificação OTA desabilitada (ota_check_enabled=false).");
+                FileAgentLogger.LogApply("recusado: verificação OTA desabilitada (ota_check_enabled=false).");
+                WriteApplyError(config, "Verificação OTA desabilitada.");
+                return 1;
+            }
+
+            if (!OtaCheckSchedule.IsWithinWindow(nowLocal, policy.WindowStart, policy.WindowEnd))
+            {
+                Console.Error.WriteLine(
+                    $"Apply recusado: fora da janela de manutenção OTA ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
+                FileAgentLogger.LogApply(
+                    $"recusado: fora da janela de manutenção OTA ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
+                WriteApplyError(config, "Fora da janela de manutenção OTA.");
+                return 1;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(packagePath))
         {
             FileAgentLogger.LogApply("falhou: pacote não informado (--package).");
+            WriteApplyError(config, "Pacote não informado (--package).");
             await SendAckAsync(config, manifest, versionPrevious, versionPrevious, "error", "download_failed", "Pacote não informado (--package).", cancellationToken);
             return 1;
         }
@@ -83,6 +103,7 @@ public sealed class ApplyUpdateService
         if (!verifyResult.Success)
         {
             FileAgentLogger.LogApply($"falhou na verificação: {verifyResult.Message}");
+            WriteApplyError(config, verifyResult.Message);
             var errorCode = verifyResult.Message.Contains("SHA-256", StringComparison.Ordinal)
                 ? "hash_mismatch"
                 : verifyResult.Message.Contains("Assinatura", StringComparison.Ordinal)
@@ -134,6 +155,7 @@ public sealed class ApplyUpdateService
             {
                 Console.Error.WriteLine($"Health falhou: {health.Message}");
                 FileAgentLogger.LogApply($"Health falhou: {health.Message}");
+                WriteApplyError(config, health.Message ?? "Health check falhou.");
                 await RollbackAsync(config, cancellationToken);
                 var rolledBackVersion = _releaseManager.GetCurrentReleaseVersion(config) ?? versionPrevious;
                 await SendAckAsync(config, manifest, versionPrevious, rolledBackVersion, "rolled_back", health.ErrorCode, health.Message, cancellationToken);
@@ -144,6 +166,14 @@ public sealed class ApplyUpdateService
             _backupService.CollectGarbage(config.BackupsDir, config.MaxReleaseFolders);
 
             await SendAckAsync(config, manifest, versionPrevious, manifest.Version, "success", null, null, cancellationToken);
+            WriteStatus(config, status => status with
+            {
+                Phase = OtaUpdatePhases.Idle,
+                CurrentVersion = manifest.Version,
+                RemoteVersion = null,
+                UpdateAvailable = false,
+                ErrorMessage = null,
+            });
             Console.WriteLine($"Apply concluído: {manifest.Version}");
             FileAgentLogger.LogApply($"concluído: {manifest.Version}");
             return 0;
@@ -152,6 +182,7 @@ public sealed class ApplyUpdateService
         {
             Console.Error.WriteLine($"apply falhou: {ex.Message}");
             FileAgentLogger.LogApply($"falhou: {ex.Message}");
+            WriteApplyError(config, ex.Message);
 
             if (kioskStopped)
             {
@@ -208,5 +239,21 @@ public sealed class ApplyUpdateService
             DateTimeOffset.UtcNow);
 
         return _ackClient.SendAckAsync(config, payload, cancellationToken);
+    }
+
+    private void WriteApplyError(OtaAgentConfig config, string message)
+    {
+        WriteStatus(config, status => status with
+        {
+            Phase = OtaUpdatePhases.Error,
+            CurrentVersion = config.CurrentVersion,
+            ErrorMessage = message,
+        });
+    }
+
+    private void WriteStatus(OtaAgentConfig config, Func<OtaUpdateStatus, OtaUpdateStatus> mutator)
+    {
+        var current = _statusStore.Read(config);
+        _statusStore.Write(config, mutator(current));
     }
 }

@@ -9,5 +9,6 @@ public sealed record UpdateManifest(
     string SignatureB64,
     string SignatureAlgorithm,
     DateTimeOffset ReleasedAt,
-    string PackageType = "full"
+    string PackageType = "full",
+    string? DownloadUrl = null
 );

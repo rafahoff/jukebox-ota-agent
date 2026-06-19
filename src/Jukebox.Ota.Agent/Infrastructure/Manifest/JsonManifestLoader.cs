@@ -44,7 +44,8 @@ public sealed class JsonManifestLoader
             dto.SignatureB64 ?? string.Empty,
             dto.SignatureAlgorithm ?? "rsa-pss-sha256",
             dto.ReleasedAt ?? DateTimeOffset.UtcNow,
-            dto.PackageType ?? "full");
+            dto.PackageType ?? "full",
+            dto.DownloadUrl);
 
     private sealed class UpdateManifestDto
     {
@@ -71,5 +72,8 @@ public sealed class JsonManifestLoader
 
         [JsonPropertyName("package_type")]
         public string? PackageType { get; set; }
+
+        [JsonPropertyName("download_url")]
+        public string? DownloadUrl { get; set; }
     }
 }

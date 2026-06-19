@@ -20,7 +20,7 @@ public class CheckUpdateServicePolicyTests
 
         try
         {
-            var service = BuildService(configPath, policy, new InMemoryCheckStateStore(), httpSpy);
+            var service = BuildService(configPath, policy, new InMemoryStatusStore(), httpSpy);
             var exitCode = await service.RunAsync(configPath);
 
             Assert.Equal(0, exitCode);
@@ -44,7 +44,7 @@ public class CheckUpdateServicePolicyTests
 
         try
         {
-            var service = BuildService(configPath, policy, new InMemoryCheckStateStore(), httpSpy);
+            var service = BuildService(configPath, policy, new InMemoryStatusStore(), httpSpy);
             var exitCode = await service.RunAsync(configPath);
 
             Assert.Equal(0, exitCode);
@@ -59,15 +59,18 @@ public class CheckUpdateServicePolicyTests
     [Fact]
     public async Task RunAsync_IntervaloNaoDecorrido_RetornaZeroSemHttp()
     {
-        var configPath = WriteMinimalConfig();
+        var root = Path.Combine(Path.GetTempPath(), $"ota-policy-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var configPath = WriteConfigWithKioskData(root);
         var policy = new FakePolicyProvider(OtaCheckPolicy.Default);
-        var stateStore = new InMemoryCheckStateStore();
-        stateStore.SetLastCheckAt("/var/lib/jukebox-ota", DateTimeOffset.UtcNow.AddMinutes(-5));
+        var statusStore = new InMemoryStatusStore();
+        var config = new JsonConfigLoader().Load(configPath);
+        statusStore.SetCheckedAt(config, DateTimeOffset.UtcNow.AddMinutes(-5));
         var httpSpy = new HttpSpyOtaClient(shouldBeCalled: false);
 
         try
         {
-            var service = BuildService(configPath, policy, stateStore, httpSpy);
+            var service = BuildService(configPath, policy, statusStore, httpSpy);
             var exitCode = await service.RunAsync(configPath);
 
             Assert.Equal(0, exitCode);
@@ -75,16 +78,17 @@ public class CheckUpdateServicePolicyTests
         }
         finally
         {
-            File.Delete(configPath);
+            Directory.Delete(root, recursive: true);
         }
     }
 
     [Fact]
-    public async Task RunAsync_CheckBemSucedido_AtualizaLastCheckAt()
+    public async Task RunAsync_CheckBemSucedido_AtualizaCheckedAtMs()
     {
         var manifestPath = Path.Combine(Path.GetTempPath(), $"ota-manifest-{Guid.NewGuid():N}.json");
-        var configPath = Path.Combine(Path.GetTempPath(), $"ota-config-{Guid.NewGuid():N}.json");
-        var stateDir = Path.Combine(Path.GetTempPath(), $"ota-state-{Guid.NewGuid():N}");
+        var root = Path.Combine(Path.GetTempPath(), $"ota-policy-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var configPath = WriteConfigWithKioskData(root, manifestPath);
 
         File.WriteAllText(manifestPath, """
             {
@@ -98,56 +102,93 @@ public class CheckUpdateServicePolicyTests
             }
             """);
 
-        var fileUrl = new Uri(manifestPath).AbsoluteUri;
-        File.WriteAllText(configPath, $$"""
+        try
+        {
+            using var client = new HttpOtaUpdateClient();
+            var statusStore = new FileOtaUpdateStatusStore();
+            var service = new CheckUpdateService(
+                new JsonConfigLoader(),
+                client,
+                new ConsoleTelemetryReporter(),
+                new FakePolicyProvider(OtaCheckPolicy.Default with { IntervalMinutes = 15 }),
+                statusStore);
+
+            var exitCode = await service.RunAsync(configPath);
+
+            Assert.Equal(2, exitCode);
+            var config = new JsonConfigLoader().Load(configPath);
+            Assert.NotNull(statusStore.GetCheckedAt(config));
+        }
+        finally
+        {
+            File.Delete(manifestPath);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_ComForce_IgnoraPoliticaEIntervalo()
+    {
+        var manifestPath = Path.Combine(Path.GetTempPath(), $"ota-manifest-{Guid.NewGuid():N}.json");
+        var root = Path.Combine(Path.GetTempPath(), $"ota-policy-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var configPath = WriteConfigWithKioskData(root, manifestPath);
+
+        File.WriteAllText(manifestPath, """
             {
-              "device_id": "machine-001",
-              "channel": "beta",
-              "ota_base_url": "{{fileUrl}}",
-              "current_version": "1.4.1",
-              "public_key_path": "",
-              "state_directory": "{{stateDir.Replace("\\", "\\\\")}}"
+              "app": "jukeeo",
+              "version": "9.9.9",
+              "arch": "aarch64",
+              "sha256": "abc123",
+              "signature_b64": "",
+              "signature_algorithm": "rsa-pss-sha256",
+              "released_at": "2026-06-12T12:00:00Z"
             }
             """);
 
         try
         {
             using var client = new HttpOtaUpdateClient();
-            var stateStore = new FileOtaCheckStateStore();
+            var statusStore = new InMemoryStatusStore();
+            var config = new JsonConfigLoader().Load(configPath);
+            statusStore.SetCheckedAt(config, DateTimeOffset.UtcNow);
+
+            var now = TimeOnly.FromDateTime(DateTime.Now);
+            var policy = new FakePolicyProvider(new OtaCheckPolicy(
+                false,
+                30,
+                now.AddHours(2),
+                now.AddHours(4)));
+
             var service = new CheckUpdateService(
                 new JsonConfigLoader(),
                 client,
                 new ConsoleTelemetryReporter(),
-                new FakePolicyProvider(OtaCheckPolicy.Default with { IntervalMinutes = 15 }),
-                stateStore);
+                policy,
+                statusStore);
 
-            var exitCode = await service.RunAsync(configPath);
+            var exitCode = await service.RunAsync(configPath, force: true);
 
             Assert.Equal(2, exitCode);
-            Assert.NotNull(stateStore.GetLastCheckAt(stateDir));
         }
         finally
         {
             File.Delete(manifestPath);
-            File.Delete(configPath);
-            if (Directory.Exists(stateDir))
-            {
-                Directory.Delete(stateDir, recursive: true);
-            }
+            Directory.Delete(root, recursive: true);
         }
     }
 
     private static CheckUpdateService BuildService(
         string configPath,
         IOtaPolicyProvider policy,
-        IOtaCheckStateStore stateStore,
+        IOtaUpdateStatusStore statusStore,
         HttpSpyOtaClient httpSpy) =>
         new(
             new JsonConfigLoader(),
             httpSpy,
             new ConsoleTelemetryReporter(),
             policy,
-            stateStore);
+            statusStore);
 
     private static string WriteMinimalConfig()
     {
@@ -162,20 +203,56 @@ public class CheckUpdateServicePolicyTests
         return path;
     }
 
+    private static string WriteConfigWithKioskData(string root, string? manifestPath = null)
+    {
+        var kioskData = Path.Combine(root, "kiosk-data");
+        Directory.CreateDirectory(kioskData);
+        var manifest = manifestPath ?? "file:///tmp/manifest.json";
+        var fileUrl = manifestPath is not null ? new Uri(manifestPath).AbsoluteUri : manifest;
+        var path = Path.Combine(root, "ota-agent.json");
+        File.WriteAllText(path, $$"""
+            {
+              "device_id": "machine-001",
+              "channel": "beta",
+              "ota_base_url": "{{fileUrl}}",
+              "current_version": "1.4.1",
+              "public_key_path": "",
+              "kiosk_data_dir": "{{kioskData.Replace("\\", "\\\\")}}"
+            }
+            """);
+        return path;
+    }
+
     private sealed class FakePolicyProvider(OtaCheckPolicy policy) : IOtaPolicyProvider
     {
         public OtaCheckPolicy GetPolicy(OtaAgentConfig config) => policy;
     }
 
-    private sealed class InMemoryCheckStateStore : IOtaCheckStateStore
+    private sealed class InMemoryStatusStore : IOtaUpdateStatusStore
     {
-        private readonly Dictionary<string, DateTimeOffset> _values = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, OtaUpdateStatus> _values = new(StringComparer.Ordinal);
 
-        public DateTimeOffset? GetLastCheckAt(string stateDirectory) =>
-            _values.TryGetValue(stateDirectory, out var value) ? value : null;
+        private static string Key(OtaAgentConfig config) =>
+            config.KioskDataDir + "|" + config.StateDirectory;
 
-        public void SetLastCheckAt(string stateDirectory, DateTimeOffset timestamp) =>
-            _values[stateDirectory] = timestamp;
+        public OtaUpdateStatus Read(OtaAgentConfig config) =>
+            _values.TryGetValue(Key(config), out var value)
+                ? value
+                : new OtaUpdateStatus(CurrentVersion: config.CurrentVersion);
+
+        public void Write(OtaAgentConfig config, OtaUpdateStatus status) =>
+            _values[Key(config)] = status;
+
+        public DateTimeOffset? GetCheckedAt(OtaAgentConfig config)
+        {
+            var status = Read(config);
+            return status.CheckedAtMs is long epochMs
+                ? DateTimeOffset.FromUnixTimeMilliseconds(epochMs)
+                : null;
+        }
+
+        public void SetCheckedAt(OtaAgentConfig config, DateTimeOffset timestamp) =>
+            Write(config, Read(config) with { CheckedAtMs = timestamp.ToUnixTimeMilliseconds() });
     }
 
     private sealed class HttpSpyOtaClient(bool shouldBeCalled) : IOtaUpdateClient, IDisposable
@@ -194,6 +271,13 @@ public class CheckUpdateServicePolicyTests
 
             return Task.FromResult<Domain.Entities.UpdateManifest?>(null);
         }
+
+        public Task<string> DownloadPackageAsync(
+            OtaAgentConfig config,
+            Domain.Entities.UpdateManifest manifest,
+            string destinationDirectory,
+            CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
 
         public void Dispose()
         {

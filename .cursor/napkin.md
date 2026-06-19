@@ -52,8 +52,8 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 - [2026-06-19] **Backup pré-update no apply**
   Faça assim: origem `kiosk_data_dir` (`jukebox_library.db` + wal/shm + `shared_preferences.json`); destino `/opt/jukeeo/backups/pre-{versão}-{ts UTC}/`; `IBackupService` em `Infrastructure/Backup/FileSystemBackupService.cs`; rollback automático **não** restaura DB — ver `README.md` § Backup e `docs/API.md` § apply.
 
-- [2026-06-19] **Política OTA via SQLite do kiosk**
-  Faça assim: chaves em `machine_config` (`ota_check_enabled`, `ota_check_interval_hours`, `ota_check_window_start/end`); agente lê `jukebox_library.db` em `kiosk_data_dir`; defaults se DB ausente; `last_check_at_ms` em `/var/lib/jukebox-ota/`; timer systemd `OnUnitActiveSec=10min` (política no agente, não no timer).
+- [2026-06-19] **Estado OTA partilhado (ADR 0001)**
+  Faça assim: `{kiosk_data_dir}/ota_update_status.json` (schema v1); `checked_at_ms` substitui `last_check_at_ms` em `state_directory`; migração one-shot automática; `check|upgrade|apply --force` ignora política SQLite; `upgrade` = check → download (`{state_directory}/downloads/`) → apply.
 
 - [2026-06-12] **Logs separados do kiosk**
   Faça assim: unit com `SyslogIdentifier=jukebox-ota`; validar com `journalctl -t jukebox-ota`. Arquivo compartilhado: `/home/jukebox/.local/share/com.jukeeo.kiosk/logs/jukebox_ota_agent.log` (rotação 5 MB × 5, `FileAgentLogger`); Windows dev: `%APPDATA%\com.jukeeo\kiosk\logs\`. Unit precisa `ReadWritePaths` nessa pasta; `pi_install_ota.sh` aplica ACL escrita `jukebox-ota` + leitura default `jukebox` (debug screen). Falhas de check no arquivo usam `OtaCheckErrorFormatter` (PT); journald mantém mensagem técnica em inglês.

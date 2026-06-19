@@ -151,13 +151,44 @@ public class ApplyUpdateServiceTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_Sucesso_LimpaUpdateAvailableNoJson()
+    {
+        var root = CreateTempLayout();
+        var configPath = WriteConfig(root);
+        var manifestPath = WriteManifest(root);
+        var packagePath = await CreatePackageAsync(root);
+
+        try
+        {
+            var statusStore = new FileOtaUpdateStatusStore();
+            var ackSpy = new AckSpy();
+            var service = BuildService(root, ackSpy, new FakeHealthChecker(success: true), statusStore: statusStore);
+
+            var exitCode = await service.RunAsync(configPath, manifestPath, packagePath);
+
+            Assert.Equal(0, exitCode);
+            var config = new JsonConfigLoader().Load(configPath);
+            var status = statusStore.Read(config);
+            Assert.False(status.UpdateAvailable);
+            Assert.Equal(OtaUpdatePhases.Idle, status.Phase);
+            Assert.Equal("1.4.2", status.CurrentVersion);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static ApplyUpdateService BuildService(
         string root,
         AckSpy ackSpy,
         IHealthChecker healthChecker,
-        OtaCheckPolicy? policy = null)
+        OtaCheckPolicy? policy = null,
+        IOtaUpdateStatusStore? statusStore = null)
     {
         var effectivePolicy = policy ?? OtaCheckPolicy.Default;
+        var effectiveStatusStore = statusStore ?? new InMemoryStatusStore();
         var config = new OtaAgentConfig(
             "machine-test",
             "beta",
@@ -185,7 +216,8 @@ public class ApplyUpdateServiceTests
             new FileSystemBackupService(),
             healthChecker,
             ackSpy,
-            new FakePolicyProvider(effectivePolicy));
+            new FakePolicyProvider(effectivePolicy),
+            effectiveStatusStore);
     }
 
     private sealed class FakePolicyProvider(OtaCheckPolicy policy) : Domain.Services.IOtaPolicyProvider
@@ -319,5 +351,32 @@ public class ApplyUpdateServiceTests
             Payloads.Add(payload);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class InMemoryStatusStore : IOtaUpdateStatusStore
+    {
+        private readonly Dictionary<string, OtaUpdateStatus> _values = new(StringComparer.Ordinal);
+
+        private static string Key(OtaAgentConfig config) =>
+            config.KioskDataDir + "|" + config.StateDirectory;
+
+        public OtaUpdateStatus Read(OtaAgentConfig config) =>
+            _values.TryGetValue(Key(config), out var value)
+                ? value
+                : new OtaUpdateStatus(CurrentVersion: config.CurrentVersion);
+
+        public void Write(OtaAgentConfig config, OtaUpdateStatus status) =>
+            _values[Key(config)] = status;
+
+        public DateTimeOffset? GetCheckedAt(OtaAgentConfig config)
+        {
+            var status = Read(config);
+            return status.CheckedAtMs is long epochMs
+                ? DateTimeOffset.FromUnixTimeMilliseconds(epochMs)
+                : null;
+        }
+
+        public void SetCheckedAt(OtaAgentConfig config, DateTimeOffset timestamp) =>
+            Write(config, Read(config) with { CheckedAtMs = timestamp.ToUnixTimeMilliseconds() });
     }
 }

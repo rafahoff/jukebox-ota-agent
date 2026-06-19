@@ -7,4 +7,10 @@ namespace Jukebox.Ota.Agent.Domain.Repositories;
 public interface IOtaUpdateClient
 {
     Task<UpdateManifest?> CheckAsync(OtaAgentConfig config, CancellationToken cancellationToken = default);
+
+    Task<string> DownloadPackageAsync(
+        OtaAgentConfig config,
+        UpdateManifest manifest,
+        string destinationDirectory,
+        CancellationToken cancellationToken = default);
 }

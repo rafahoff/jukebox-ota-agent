@@ -24,6 +24,7 @@ public sealed class JsonManifestWriter
             SignatureB64 = string.IsNullOrWhiteSpace(manifest.SignatureB64) ? null : manifest.SignatureB64,
             SignatureAlgorithm = manifest.SignatureAlgorithm,
             ReleasedAt = manifest.ReleasedAt.ToUniversalTime(),
+            DownloadUrl = manifest.DownloadUrl,
         };
 
         var json = JsonSerializer.Serialize(dto, Options);
@@ -55,5 +56,8 @@ public sealed class JsonManifestWriter
 
         [JsonPropertyName("released_at")]
         public DateTimeOffset ReleasedAt { get; set; }
+
+        [JsonPropertyName("download_url")]
+        public string? DownloadUrl { get; set; }
     }
 }

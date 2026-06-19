@@ -1,5 +1,7 @@
+using Jukebox.Ota.Agent.Domain.Entities;
 using Jukebox.Ota.Agent.Domain.Repositories;
 using Jukebox.Ota.Agent.Domain.Services;
+using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
 using Jukebox.Ota.Agent.Infrastructure.Logging;
@@ -13,69 +15,104 @@ public sealed class CheckUpdateService
     private readonly IOtaUpdateClient _otaClient;
     private readonly ITelemetryReporter _telemetry;
     private readonly IOtaPolicyProvider _policyProvider;
-    private readonly IOtaCheckStateStore _stateStore;
+    private readonly IOtaUpdateStatusStore _statusStore;
 
     public CheckUpdateService(
         JsonConfigLoader configLoader,
         IOtaUpdateClient otaClient,
         ITelemetryReporter telemetry,
         IOtaPolicyProvider policyProvider,
-        IOtaCheckStateStore stateStore)
+        IOtaUpdateStatusStore statusStore)
     {
         _configLoader = configLoader;
         _otaClient = otaClient;
         _telemetry = telemetry;
         _policyProvider = policyProvider;
-        _stateStore = stateStore;
+        _statusStore = statusStore;
     }
 
-    public async Task<int> RunAsync(string configPath, CancellationToken cancellationToken = default)
+    public async Task<int> RunAsync(
+        string configPath,
+        bool force = false,
+        CancellationToken cancellationToken = default)
     {
-        Domain.ValueObjects.OtaAgentConfig? config = null;
+        var outcome = await ExecuteAsync(configPath, force, cancellationToken);
+        return outcome.ExitCode;
+    }
+
+    public async Task<CheckUpdateOutcome> ExecuteAsync(
+        string configPath,
+        bool force = false,
+        CancellationToken cancellationToken = default)
+    {
+        OtaAgentConfig? config = null;
+
         try
         {
             config = _configLoader.Load(configPath);
-            var policy = _policyProvider.GetPolicy(config);
-
-            if (!policy.Enabled)
+            WriteStatus(config, status => status with
             {
-                Console.WriteLine("Check ignorado: verificação OTA desabilitada (ota_check_enabled=false).");
-                _telemetry.ReportCheckSkipped(config.DeviceId, "disabled");
-                return 0;
-            }
+                Phase = OtaUpdatePhases.Checking,
+                CurrentVersion = config.CurrentVersion,
+                ErrorMessage = null,
+            });
 
-            var nowLocal = TimeOnly.FromDateTime(DateTime.Now);
-            if (!OtaCheckSchedule.IsWithinWindow(nowLocal, policy.WindowStart, policy.WindowEnd))
+            if (!force)
             {
-                Console.WriteLine(
-                    $"Check ignorado: fora da janela horária ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
-                _telemetry.ReportCheckSkipped(config.DeviceId, "outside_window");
-                return 0;
-            }
+                var policy = _policyProvider.GetPolicy(config);
 
-            var lastCheck = _stateStore.GetLastCheckAt(config.StateDirectory);
-            if (lastCheck.HasValue)
-            {
-                var elapsed = DateTimeOffset.UtcNow - lastCheck.Value;
-                var interval = TimeSpan.FromMinutes(policy.IntervalMinutes);
-                if (elapsed < interval)
+                if (!policy.Enabled)
+                {
+                    Console.WriteLine("Check ignorado: verificação OTA desabilitada (ota_check_enabled=false).");
+                    _telemetry.ReportCheckSkipped(config.DeviceId, "disabled");
+                    WriteSkippedStatus(config, "Verificação OTA desabilitada.");
+                    return new CheckUpdateOutcome(0, config, null, false, "disabled", null);
+                }
+
+                var nowLocal = TimeOnly.FromDateTime(DateTime.Now);
+                if (!OtaCheckSchedule.IsWithinWindow(nowLocal, policy.WindowStart, policy.WindowEnd))
                 {
                     Console.WriteLine(
-                        $"Check ignorado: intervalo mínimo não atingido ({policy.IntervalMinutes} min; última verificação há {elapsed.TotalMinutes:F0} min).");
-                    _telemetry.ReportCheckSkipped(config.DeviceId, "interval_not_elapsed");
-                    return 0;
+                        $"Check ignorado: fora da janela horária ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
+                    _telemetry.ReportCheckSkipped(config.DeviceId, "outside_window");
+                    WriteSkippedStatus(config, "Fora da janela horária de verificação OTA.");
+                    return new CheckUpdateOutcome(0, config, null, false, "outside_window", null);
+                }
+
+                var lastCheck = _statusStore.GetCheckedAt(config);
+                if (lastCheck.HasValue)
+                {
+                    var elapsed = DateTimeOffset.UtcNow - lastCheck.Value;
+                    var interval = TimeSpan.FromMinutes(policy.IntervalMinutes);
+                    if (elapsed < interval)
+                    {
+                        Console.WriteLine(
+                            $"Check ignorado: intervalo mínimo não atingido ({policy.IntervalMinutes} min; última verificação há {elapsed.TotalMinutes:F0} min).");
+                        _telemetry.ReportCheckSkipped(config.DeviceId, "interval_not_elapsed");
+                        WriteSkippedStatus(config, "Intervalo mínimo de verificação OTA não atingido.");
+                        return new CheckUpdateOutcome(0, config, null, false, "interval_not_elapsed", null);
+                    }
                 }
             }
 
             var manifest = await _otaClient.CheckAsync(config, cancellationToken);
+            var checkedAt = DateTimeOffset.UtcNow;
 
             if (manifest is null)
             {
                 Console.WriteLine("Nenhuma atualização disponível.");
                 FileAgentLogger.LogCheck("Nenhuma atualização disponível.");
                 _telemetry.ReportCheckResult(config.DeviceId, false, null, null);
-                _stateStore.SetLastCheckAt(config.StateDirectory, DateTimeOffset.UtcNow);
-                return 0;
+                WriteStatus(config, status => status with
+                {
+                    Phase = OtaUpdatePhases.Idle,
+                    CheckedAtMs = checkedAt.ToUnixTimeMilliseconds(),
+                    CurrentVersion = config.CurrentVersion,
+                    RemoteVersion = null,
+                    UpdateAvailable = false,
+                    ErrorMessage = null,
+                });
+                return new CheckUpdateOutcome(0, config, null, false, null, null);
             }
 
             var updateAvailable = !string.Equals(
@@ -92,8 +129,17 @@ public sealed class CheckUpdateService
                 : $"Versão remota {manifest.Version} coincide com a atual.");
 
             _telemetry.ReportCheckResult(config.DeviceId, updateAvailable, manifest.Version, null);
-            _stateStore.SetLastCheckAt(config.StateDirectory, DateTimeOffset.UtcNow);
-            return updateAvailable ? 2 : 0;
+            WriteStatus(config, status => status with
+            {
+                Phase = updateAvailable ? OtaUpdatePhases.UpdateAvailable : OtaUpdatePhases.Idle,
+                CheckedAtMs = checkedAt.ToUnixTimeMilliseconds(),
+                CurrentVersion = config.CurrentVersion,
+                RemoteVersion = manifest.Version,
+                UpdateAvailable = updateAvailable,
+                ErrorMessage = null,
+            });
+
+            return new CheckUpdateOutcome(updateAvailable ? 2 : 0, config, manifest, updateAvailable, null, null);
         }
         catch (Exception ex)
         {
@@ -108,7 +154,38 @@ public sealed class CheckUpdateService
                 checkEndpoint,
                 ex);
             _telemetry.ReportCheckResult(deviceId, false, null, ex.Message);
-            return 1;
+
+            if (config is not null)
+            {
+                WriteStatus(config, status => status with
+                {
+                    Phase = OtaUpdatePhases.Error,
+                    CurrentVersion = config.CurrentVersion,
+                    ErrorMessage = ex.Message,
+                });
+            }
+
+            return new CheckUpdateOutcome(1, config, null, false, null, ex.Message);
         }
     }
+
+    private void WriteSkippedStatus(OtaAgentConfig config, string _)
+    {
+        var current = _statusStore.Read(config);
+        WriteStatus(config, current with
+        {
+            Phase = OtaUpdatePhases.Idle,
+            CurrentVersion = config.CurrentVersion,
+            ErrorMessage = null,
+        });
+    }
+
+    private void WriteStatus(OtaAgentConfig config, Func<OtaUpdateStatus, OtaUpdateStatus> mutator)
+    {
+        var current = _statusStore.Read(config);
+        _statusStore.Write(config, mutator(current));
+    }
+
+    private void WriteStatus(OtaAgentConfig config, OtaUpdateStatus status) =>
+        _statusStore.Write(config, status);
 }

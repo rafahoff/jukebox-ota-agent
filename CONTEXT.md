@@ -33,4 +33,16 @@ Pacote `jukeeo-<versão>+aarch64.tar.zst` com bundle flutter-pi completo (v1: s�
 | `jukebox-ota-server` | API de rollout (futuro) |
 | `jukeeo-knowledge` | Brainstorm e decisões de produto |
 
-Plano de execução: `jukebox_tv/docs/plans/PLANO_OTA_EXECUCAO_PI.md`.
+Plano de execução: `jukebox_tv/docs/plans/PLANO_OTA_EXECUCAO_PI.md`. UI e estado partilhado: `jukebox_tv/docs/plans/PLANO_OTA_UI_SETTINGS.md` (ADR 0001).
+
+## ota_update_status
+
+Ficheiro `ota_update_status.json` em `kiosk_data_dir` (`~/.local/share/com.jukeeo.kiosk/`), escrito pelo agente e lido pelo kiosk Flutter. Contrato de estado OTA visível na UI (versão remota, disponibilidade de update, fase corrente, última verificação). Ver ADR 0001.
+
+## phase
+
+Campo `phase` do `ota_update_status.json`: estado do ciclo OTA (`idle`, `checking`, `update_available`, `downloading`, `applying`, `error`). O kiosk usa `phase` para feedback na secção de definições; o agente é a única fonte de escrita.
+
+## Comando upgrade
+
+Subcomando CLI `jukebox-ota-agent upgrade --config <arquivo> [--force]` que orquestra verificação, download, apply e restart do kiosk num único fluxo. Disparo manual a partir do Pi via `systemd-run`; download permanece exclusivo do agente.

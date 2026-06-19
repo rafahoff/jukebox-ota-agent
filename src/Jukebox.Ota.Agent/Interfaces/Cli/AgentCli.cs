@@ -9,19 +9,22 @@ public sealed class AgentCli
     private readonly VerifyPackageService _verifyService;
     private readonly SignManifestService _signManifestService;
     private readonly ApplyUpdateService _applyService;
+    private readonly UpgradeUpdateService _upgradeService;
 
     public AgentCli(
         VersionService versionService,
         CheckUpdateService checkService,
         VerifyPackageService verifyService,
         SignManifestService signManifestService,
-        ApplyUpdateService applyService)
+        ApplyUpdateService applyService,
+        UpgradeUpdateService upgradeService)
     {
         _versionService = versionService;
         _checkService = checkService;
         _verifyService = verifyService;
         _signManifestService = signManifestService;
         _applyService = applyService;
+        _upgradeService = upgradeService;
     }
 
     public async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
@@ -36,6 +39,7 @@ public sealed class AgentCli
         {
             "version" => RunVersion(),
             "check" => await RunCheckAsync(args, cancellationToken),
+            "upgrade" => await RunUpgradeAsync(args, cancellationToken),
             "verify" => await RunVerifyAsync(args, cancellationToken),
             "sign-manifest" => await RunSignManifestAsync(args, cancellationToken),
             "apply" => await RunApplyAsync(args, cancellationToken),
@@ -54,8 +58,18 @@ public sealed class AgentCli
     {
         var configPath = GetOptionValue(args, "--config")
             ?? throw new ArgumentException("check requer --config <caminho>.");
+        var force = HasFlag(args, "--force");
 
-        return await _checkService.RunAsync(configPath, cancellationToken);
+        return await _checkService.RunAsync(configPath, force, cancellationToken);
+    }
+
+    private async Task<int> RunUpgradeAsync(string[] args, CancellationToken cancellationToken)
+    {
+        var configPath = GetOptionValue(args, "--config")
+            ?? throw new ArgumentException("upgrade requer --config <caminho>.");
+        var force = HasFlag(args, "--force");
+
+        return await _upgradeService.RunAsync(configPath, force, cancellationToken);
     }
 
     private async Task<int> RunVerifyAsync(string[] args, CancellationToken cancellationToken)
@@ -87,8 +101,9 @@ public sealed class AgentCli
         var manifestPath = GetOptionValue(args, "--manifest")
             ?? throw new ArgumentException("apply requer --manifest <caminho>.");
         var packagePath = GetOptionValue(args, "--package");
+        var force = HasFlag(args, "--force");
 
-        return await _applyService.RunAsync(configPath, manifestPath, packagePath, cancellationToken);
+        return await _applyService.RunAsync(configPath, manifestPath, packagePath, force, cancellationToken);
     }
 
     private static int RunHelp()
@@ -111,10 +126,11 @@ public sealed class AgentCli
 
             Uso:
               jukebox-ota-agent version
-              jukebox-ota-agent check --config <arquivo.json>
+              jukebox-ota-agent check --config <arquivo.json> [--force]
+              jukebox-ota-agent upgrade --config <arquivo.json> [--force]
               jukebox-ota-agent verify --manifest <manifest.json> --package <arquivo> [--public-key <chave.pem>]
               jukebox-ota-agent sign-manifest --manifest <in.json> --private-key <pem> [--output <out.json>]
-              jukebox-ota-agent apply --config <json> --manifest <json> [--package <path>]
+              jukebox-ota-agent apply --config <json> --manifest <json> [--package <path>] [--force]
             """);
     }
 
@@ -130,4 +146,7 @@ public sealed class AgentCli
 
         return null;
     }
+
+    private static bool HasFlag(string[] args, string flag) =>
+        args.Any(arg => string.Equals(arg, flag, StringComparison.Ordinal));
 }

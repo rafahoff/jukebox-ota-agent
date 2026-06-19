@@ -39,6 +39,61 @@ public sealed class HttpOtaUpdateClient : IOtaUpdateClient, IDisposable
         return JsonManifestLoader.FromJson(json);
     }
 
+    public async Task<string> DownloadPackageAsync(
+        OtaAgentConfig config,
+        UpdateManifest manifest,
+        string destinationDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+
+        var fileName = $"jukeeo-{manifest.Version}+{manifest.Arch}.tar.zst";
+        var destinationPath = Path.Combine(destinationDirectory, fileName);
+
+        var sourceUrl = ResolveDownloadUrl(config, manifest);
+        if (sourceUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+        {
+            var sourcePath = new Uri(sourceUrl).LocalPath;
+            if (!File.Exists(sourcePath))
+            {
+                throw new FileNotFoundException($"Pacote OTA não encontrado: {sourcePath}");
+            }
+
+            File.Copy(sourcePath, destinationPath, overwrite: true);
+            return destinationPath;
+        }
+
+        using var response = await _httpClient.GetAsync(sourceUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var sourceStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var destinationStream = File.Create(destinationPath);
+        await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+
+        return destinationPath;
+    }
+
+    public static string ResolveDownloadUrl(OtaAgentConfig config, UpdateManifest manifest)
+    {
+        if (!string.IsNullOrWhiteSpace(manifest.DownloadUrl))
+        {
+            return manifest.DownloadUrl;
+        }
+
+        if (config.OtaBaseUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+        {
+            var manifestPath = new Uri(config.OtaBaseUrl).LocalPath;
+            var manifestDir = Path.GetDirectoryName(manifestPath)
+                ?? throw new InvalidOperationException($"Diretório do manifesto inválido: {manifestPath}");
+            var packageName = $"jukeeo-{manifest.Version}+{manifest.Arch}.tar.zst";
+            var packagePath = Path.Combine(manifestDir, packageName);
+            return new Uri(packagePath).AbsoluteUri;
+        }
+
+        var baseUri = config.OtaBaseUrl.TrimEnd('/');
+        return $"{baseUri}/ota/{manifest.App}/{manifest.Version}/{manifest.Arch}/jukeeo-{manifest.Version}+{manifest.Arch}.tar.zst";
+    }
+
     private static Uri BuildCheckUri(OtaAgentConfig config)
     {
         var baseUri = config.OtaBaseUrl.TrimEnd('/');
