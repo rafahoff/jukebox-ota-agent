@@ -47,7 +47,7 @@ public sealed class FileSystemBackupService : IBackupService
         FolderGarbageCollector.Collect(backupsDir, new HashSet<string>(StringComparer.Ordinal), maxFolders);
     }
 
-    internal static string ResolveKioskDataDir(OtaAgentConfig config)
+    public static string ResolveKioskDataDir(OtaAgentConfig config)
     {
         if (!string.IsNullOrWhiteSpace(config.KioskDataDir))
         {

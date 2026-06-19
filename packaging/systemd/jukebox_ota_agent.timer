@@ -3,7 +3,7 @@ Description=Timer periódico do Jukebox OTA Agent
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=6h
+OnUnitActiveSec=10min
 Persistent=true
 
 [Install]

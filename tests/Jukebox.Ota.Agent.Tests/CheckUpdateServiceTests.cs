@@ -1,4 +1,5 @@
 using Jukebox.Ota.Agent.Application.Services;
+using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
 using Jukebox.Ota.Agent.Infrastructure.Telemetry;
@@ -42,7 +43,9 @@ public class CheckUpdateServiceTests
             var service = new CheckUpdateService(
                 new JsonConfigLoader(),
                 client,
-                new ConsoleTelemetryReporter());
+                new ConsoleTelemetryReporter(),
+                new AlwaysAllowPolicyProvider(),
+                new NoOpCheckStateStore());
 
             var exitCode = await service.RunAsync(configPath);
 
@@ -52,6 +55,21 @@ public class CheckUpdateServiceTests
         {
             File.Delete(manifestPath);
             File.Delete(configPath);
+        }
+    }
+
+    private sealed class AlwaysAllowPolicyProvider : Domain.Services.IOtaPolicyProvider
+    {
+        public OtaCheckPolicy GetPolicy(Domain.ValueObjects.OtaAgentConfig config) =>
+            OtaCheckPolicy.Default with { IntervalMinutes = 15 };
+    }
+
+    private sealed class NoOpCheckStateStore : Domain.Services.IOtaCheckStateStore
+    {
+        public DateTimeOffset? GetLastCheckAt(string stateDirectory) => null;
+
+        public void SetLastCheckAt(string stateDirectory, DateTimeOffset timestamp)
+        {
         }
     }
 }

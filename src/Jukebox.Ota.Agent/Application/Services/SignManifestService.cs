@@ -1,4 +1,5 @@
 using Jukebox.Ota.Agent.Domain.Services;
+using Jukebox.Ota.Agent.Infrastructure.Logging;
 using Jukebox.Ota.Agent.Infrastructure.Manifest;
 
 namespace Jukebox.Ota.Agent.Application.Services;
@@ -38,11 +39,13 @@ public sealed class SignManifestService
             var destination = outputPath ?? manifestPath;
             _manifestWriter.Write(destination, signed);
             Console.WriteLine($"Manifesto assinado gravado em: {destination}");
+            FileAgentLogger.LogSignManifest($"Manifesto assinado gravado em: {destination}");
             return 0;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"sign-manifest falhou: {ex.Message}");
+            FileAgentLogger.LogSignManifest($"falhou: {ex.Message}");
             return 1;
         }
     }

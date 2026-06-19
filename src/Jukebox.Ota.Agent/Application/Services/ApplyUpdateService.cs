@@ -2,7 +2,9 @@ using Jukebox.Ota.Agent.Domain.Entities;
 using Jukebox.Ota.Agent.Domain.Repositories;
 using Jukebox.Ota.Agent.Domain.Services;
 using Jukebox.Ota.Agent.Infrastructure.Config;
+using Jukebox.Ota.Agent.Infrastructure.Logging;
 using Jukebox.Ota.Agent.Infrastructure.Manifest;
+using Jukebox.Ota.Agent.Infrastructure.Policy;
 
 namespace Jukebox.Ota.Agent.Application.Services;
 
@@ -18,6 +20,7 @@ public sealed class ApplyUpdateService
     private readonly IBackupService _backupService;
     private readonly IHealthChecker _healthChecker;
     private readonly IOtaAckClient _ackClient;
+    private readonly IOtaPolicyProvider _policyProvider;
 
     public ApplyUpdateService(
         JsonConfigLoader configLoader,
@@ -27,7 +30,8 @@ public sealed class ApplyUpdateService
         IReleaseManager releaseManager,
         IBackupService backupService,
         IHealthChecker healthChecker,
-        IOtaAckClient ackClient)
+        IOtaAckClient ackClient,
+        IOtaPolicyProvider policyProvider)
     {
         _configLoader = configLoader;
         _manifestLoader = manifestLoader;
@@ -37,6 +41,7 @@ public sealed class ApplyUpdateService
         _backupService = backupService;
         _healthChecker = healthChecker;
         _ackClient = ackClient;
+        _policyProvider = policyProvider;
     }
 
     public async Task<int> RunAsync(
@@ -49,8 +54,27 @@ public sealed class ApplyUpdateService
         var manifest = _manifestLoader.Load(manifestPath);
         var versionPrevious = _releaseManager.GetCurrentReleaseVersion(config) ?? config.CurrentVersion;
 
+        var policy = _policyProvider.GetPolicy(config);
+        var nowLocal = TimeOnly.FromDateTime(DateTime.Now);
+        if (!policy.Enabled)
+        {
+            Console.Error.WriteLine("Apply recusado: verificação OTA desabilitada (ota_check_enabled=false).");
+            FileAgentLogger.LogApply("recusado: verificação OTA desabilitada (ota_check_enabled=false).");
+            return 1;
+        }
+
+        if (!OtaCheckSchedule.IsWithinWindow(nowLocal, policy.WindowStart, policy.WindowEnd))
+        {
+            Console.Error.WriteLine(
+                $"Apply recusado: fora da janela de manutenção OTA ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
+            FileAgentLogger.LogApply(
+                $"recusado: fora da janela de manutenção OTA ({policy.WindowStart:HH\\:mm}–{policy.WindowEnd:HH\\:mm}, agora {nowLocal:HH\\:mm}).");
+            return 1;
+        }
+
         if (string.IsNullOrWhiteSpace(packagePath))
         {
+            FileAgentLogger.LogApply("falhou: pacote não informado (--package).");
             await SendAckAsync(config, manifest, versionPrevious, versionPrevious, "error", "download_failed", "Pacote não informado (--package).", cancellationToken);
             return 1;
         }
@@ -58,6 +82,7 @@ public sealed class ApplyUpdateService
         var verifyResult = await _packageVerifier.VerifyAsync(manifest, packagePath, config.PublicKeyPath, cancellationToken);
         if (!verifyResult.Success)
         {
+            FileAgentLogger.LogApply($"falhou na verificação: {verifyResult.Message}");
             var errorCode = verifyResult.Message.Contains("SHA-256", StringComparison.Ordinal)
                 ? "hash_mismatch"
                 : verifyResult.Message.Contains("Assinatura", StringComparison.Ordinal)
@@ -72,25 +97,32 @@ public sealed class ApplyUpdateService
         try
         {
             Console.WriteLine($"Parando {config.KioskServiceName}...");
+            FileAgentLogger.LogApply($"Parando {config.KioskServiceName}...");
             await _systemService.StopServiceAsync(config.KioskServiceName, cancellationToken);
             kioskStopped = true;
 
             Console.WriteLine("Actualizando symlink previous ← current...");
+            FileAgentLogger.LogApply("Actualizando symlink previous ← current...");
             await _releaseManager.PointPreviousToCurrentAsync(config, cancellationToken);
 
             Console.WriteLine("Criando backup pré-update...");
+            FileAgentLogger.LogApply("Criando backup pré-update...");
             await _backupService.CreatePreUpdateBackupAsync(config, manifest.Version, cancellationToken);
 
             Console.WriteLine($"Extraindo release {manifest.Version}+{manifest.Arch}...");
+            FileAgentLogger.LogApply($"Extraindo release {manifest.Version}+{manifest.Arch}...");
             await _releaseManager.ExtractReleaseAsync(config, packagePath, manifest.Version, manifest.Arch, cancellationToken);
 
             Console.WriteLine("Trocando symlink current...");
+            FileAgentLogger.LogApply("Trocando symlink current...");
             await _releaseManager.SwapCurrentToReleaseAsync(config, manifest.Version, manifest.Arch, cancellationToken);
 
             Console.WriteLine($"Iniciando {config.KioskServiceName}...");
+            FileAgentLogger.LogApply($"Iniciando {config.KioskServiceName}...");
             await _systemService.StartServiceAsync(config.KioskServiceName, cancellationToken);
 
             Console.WriteLine($"Aguardando health ({config.HealthUrl})...");
+            FileAgentLogger.LogApply($"Aguardando health ({config.HealthUrl})...");
             var health = await _healthChecker.WaitForHealthyAsync(
                 config.KioskServiceName,
                 config.HealthUrl,
@@ -101,6 +133,7 @@ public sealed class ApplyUpdateService
             if (!health.Success)
             {
                 Console.Error.WriteLine($"Health falhou: {health.Message}");
+                FileAgentLogger.LogApply($"Health falhou: {health.Message}");
                 await RollbackAsync(config, cancellationToken);
                 var rolledBackVersion = _releaseManager.GetCurrentReleaseVersion(config) ?? versionPrevious;
                 await SendAckAsync(config, manifest, versionPrevious, rolledBackVersion, "rolled_back", health.ErrorCode, health.Message, cancellationToken);
@@ -112,11 +145,13 @@ public sealed class ApplyUpdateService
 
             await SendAckAsync(config, manifest, versionPrevious, manifest.Version, "success", null, null, cancellationToken);
             Console.WriteLine($"Apply concluído: {manifest.Version}");
+            FileAgentLogger.LogApply($"concluído: {manifest.Version}");
             return 0;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"apply falhou: {ex.Message}");
+            FileAgentLogger.LogApply($"falhou: {ex.Message}");
 
             if (kioskStopped)
             {
@@ -143,6 +178,7 @@ public sealed class ApplyUpdateService
     private async Task RollbackAsync(Domain.ValueObjects.OtaAgentConfig config, CancellationToken cancellationToken)
     {
         Console.WriteLine("Executando rollback current → previous...");
+        FileAgentLogger.LogApply("Executando rollback current → previous...");
         await _releaseManager.RollbackCurrentToPreviousAsync(config, cancellationToken);
         await _systemService.StartServiceAsync(config.KioskServiceName, cancellationToken);
     }

@@ -106,7 +106,11 @@ Fluxo mínimo para piloto:
 
 1. `systemctl stop` do kiosk (`jukeeo_kiosk_flutterpi`)
 2. `previous` ← alvo de `current`
-3. Backup SQLite + `shared_preferences.json`
+3. Backup pré-update (`FileSystemBackupService` / `IBackupService`):
+   - Origem: `kiosk_data_dir` (ex.: `/home/jukebox/.local/share/com.jukeeo.kiosk`)
+   - Destino: `{backups_dir}/pre-{versão}-{yyyyMMddHHmmss}/` (ex.: `/opt/jukeeo/backups/pre-1.0.15-20250619143022/`)
+   - Ficheiros: `jukebox_library.db`, `jukebox_library.db-wal`, `jukebox_library.db-shm` (opcionais), `shared_preferences.json`
+   - Rollback automático **não** restaura estes ficheiros — só o symlink de release
 4. Extrair pacote para `releases/<version>+<arch>/`
 5. `current` → nova release
 6. `systemctl start`
@@ -131,6 +135,37 @@ Fluxo mínimo para piloto:
 | `health_url` | `http://127.0.0.1:8080/api/health` | |
 | `kiosk_data_dir` | `~/.local/share/com.jukeeo.kiosk` | Backup pré-update |
 | `max_release_folders` | `7` | GC releases e backups |
+| `state_directory` | `/var/lib/jukebox-ota` | Estado do agente (`last_check_at_ms`) |
+
+### Política OTA (`machine_config` no SQLite do kiosk)
+
+Chaves na tabela `machine_config` do ficheiro `jukebox_library.db` (diretório `kiosk_data_dir`):
+
+| Chave | Tipo | Padrão | Notas |
+|-------|------|--------|-------|
+| `ota_check_enabled` | bool | `true` | `false` desabilita check e apply |
+| `ota_check_interval_minutes` | int | `30` | Clamp 5–60, passo 5; só afecta `check` automático |
+| `ota_check_interval_hours` | int | *(legado)* | Migrado para minutos (máx. 60) se `ota_check_interval_minutes` ausente |
+| `ota_check_window_start` | `HH:mm` | `00:00` | Hora local do Pi |
+| `ota_check_window_end` | `HH:mm` | `23:59` | Suporta janela que cruza meia-noite |
+
+Se o SQLite estiver ausente ou a leitura falhar, usam-se os defaults (check habilitado, janela dia inteiro).
+
+### Comportamento `check` (antes do HTTP)
+
+1. Carregar política (SQLite ou defaults).
+2. Se `ota_check_enabled=false` → log + telemetria `check_skipped` → **exit 0**.
+3. Se fora da janela horária (hora local) → skip → **exit 0**.
+4. Se `now - last_check < interval_minutes` → skip → **exit 0** (`last_check_at_ms` em `state_directory`).
+5. Senão executar verificação HTTP; em sucesso (com ou sem update) actualizar `last_check_at_ms`.
+
+Exit **2** mantém-se quando há update disponível. Falhas reais → exit **1**.
+
+### Comportamento `apply`
+
+- Exige `ota_check_enabled=true` **e** estar dentro da janela horária.
+- **Não** exige intervalo mínimo (apply manual ou orquestrado ignora `last_check_at`).
+- Fora da janela ou OTA desabilitado → **exit 1**, mensagem clara, **sem** `POST /v1/updates/ack` (nenhuma tentativa de swap).
 
 ## Layout no Pi (referência)
 
@@ -139,5 +174,5 @@ Fluxo mínimo para piloto:
 | `/opt/jukeeo/current` | Release em execução |
 | `/opt/jukeeo/previous` | Rollback |
 | `/opt/jukeeo/releases/` | Histórico (GC: máx. 7) |
-| `/opt/jukeeo/backups/` | Snapshot pré-update |
+| `/opt/jukeeo/backups/pre-<versão>-<ts>/` | Snapshot pré-update (SQLite + `shared_preferences.json`) |
 | `/opt/jukeeo/ota-agent/` | Binário deste repo |

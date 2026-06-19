@@ -40,7 +40,7 @@ Critério de saída F2: binário executa `version` no Pi.
 Units em `packaging/systemd/`:
 
 - `jukebox_ota_agent.service` — oneshot `check` como utilizador **`jukebox-ota`** (não root)
-- `jukebox_ota_agent.timer` — `OnBootSec=5min`, `OnUnitActiveSec=6h`
+- `jukebox_ota_agent.timer` — `OnBootSec=5min`, `OnUnitActiveSec=10min` (tick barato; intervalo/janela na política SQLite)
 
 O `pi_install_ota.sh` cria o utilizador de sistema `jukebox-ota` e aplica permissões:
 
@@ -49,9 +49,10 @@ O `pi_install_ota.sh` cria o utilizador de sistema `jukebox-ota` e aplica permis
 | `/opt/jukeeo/ota-agent/` | `root:jukebox-ota` | dirs `750`, ficheiros `640`, binário `750` | Agente lê/executa; não grava |
 | `/etc/jukeeo/` | `root:jukebox-ota` | `750` | Config e PEM legíveis pelo grupo |
 | `/etc/jukeeo/ota-agent.json` | `root:jukebox-ota` | `640` | |
-| `/opt/jukeeo/releases`, `backups`, `ota/*` | `root:jukebox-ota` | `2775` (setgid) | Apply grava releases/backups |
+| `/opt/jukeeo/releases`, `backups`, `ota/*` | `root:jukebox-ota` | `2775` (setgid) | Apply grava releases/backups; builder em `ota/out` |
+| Utilizador builder | `jukebox` ∈ grupo `jukebox-ota` | — | `prepare_ota_release` / `package_flutterpi_bundle.sh` |
 | `/etc/sudoers.d/99-jukebox-ota-systemctl` | `root` | `440` | `systemctl` do kiosk sem password |
-| `/var/lib/jukebox-ota/` | `jukebox-ota:jukebox-ota` | `750` | Estado futuro (downloads) |
+| `/var/lib/jukebox-ota/` | `jukebox-ota:jukebox-ota` | `750` | Estado do agente (`last_check_at_ms`) |
 
 Teste manual no Pi (requer `sudo`):
 
@@ -77,14 +78,14 @@ Identificador journald: `jukebox-ota` (`SyslogIdentifier` na unit).
 | `-PiUser` | `jukebox` | Utilizador SSH |
 | `-RemotePath` | `/opt/jukeeo/ota-agent` | Destino final do binário |
 | `-RemoteStaging` | `/tmp/jukebox-ota-staging` | Staging temporário no Pi |
-| `-SkipPublish` | — | Não chama publish se artifact ausente (falha) |
+| `-SkipPublish` | — | Pula o publish; usa `artifacts/` existente (falha se ausente) |
 | `-SkipInstall` | — | Só envia staging; install manual no Pi |
 | `-EnableTimer` | — | Passa `--enable-timer` ao install |
 | `-ForceConfig` | — | Sobrescreve `/etc/jukeeo/ota-agent.json` |
 
 Fluxo interno:
 
-1. Verifica `artifacts/linux-arm64/jukebox-ota-agent` (publica se ausente)
+1. Executa `publish-linux-arm64.ps1` (rebuild) — salvo `-SkipPublish`
 2. Monta staging local com artifacts + systemd + sudoers + template de config + `pi_install_ota.sh`
 3. Envia via **WSL rsync** (preferido) ou **scp** (fallback)
 4. SSH: `sudo bash pi_install_ota.sh`
@@ -112,6 +113,7 @@ Ações:
 - Cria utilizador de sistema `jukebox-ota` (sem login)
 - Copia `artifacts/` → `/opt/jukeeo/ota-agent/` com permissões `root:jukebox-ota`
 - Cria `/opt/jukeeo/{releases,backups,ota/*}` graváveis pelo grupo `jukebox-ota`
+- Adiciona o utilizador kiosk/build (`jukebox`) ao grupo `jukebox-ota` (escrita em `ota/out`)
 - Instala `/etc/sudoers.d/99-jukebox-ota-systemctl` (systemctl do kiosk sem password)
 - ACL de leitura nos dados do kiosk (`/home/jukebox/.local/share/com.jukeeo.kiosk`)
 - Traverse ACL em `/home/jukebox`, `.local` e `.local/share` (pacote `acl` instalado se ausente)

@@ -1,5 +1,6 @@
 using Jukebox.Ota.Agent.Domain.Entities;
 using Jukebox.Ota.Agent.Domain.Services;
+using Jukebox.Ota.Agent.Infrastructure.Logging;
 using Jukebox.Ota.Agent.Infrastructure.Manifest;
 
 namespace Jukebox.Ota.Agent.Application.Services;
@@ -34,10 +35,12 @@ public sealed class VerifyPackageService
             if (result.Success)
             {
                 Console.WriteLine(result.Message);
+                FileAgentLogger.LogVerify(result.Message);
             }
             else
             {
                 Console.Error.WriteLine(result.Message);
+                FileAgentLogger.LogVerify(result.Message);
             }
 
             _telemetry.ReportVerifyResult(result.Success, result.Message);
@@ -47,6 +50,7 @@ public sealed class VerifyPackageService
         {
             var message = $"verify falhou: {ex.Message}";
             Console.Error.WriteLine(message);
+            FileAgentLogger.LogVerify($"falhou: {ex.Message}");
             _telemetry.ReportVerifyResult(false, message);
             return 1;
         }

@@ -5,7 +5,7 @@ Fluxo para validar `check` do agente contra um servidor HTTP mock no PC Windows,
 ## Pré-requisitos
 
 - Python 3 no Windows (stdlib apenas)
-- Pi com agente publicado e config em `/etc/jukebox/ota-agent.json`
+- Pi com agente publicado e config em `/etc/jukeeo/ota-agent.json`
 - PC e Pi na mesma LAN
 
 ## 1. Descobrir IP do Windows
@@ -57,7 +57,7 @@ curl -i "http://192.168.15.42:8080/v1/updates/check?device_id=pi-001&channel=bet
 
 ## 5. Config no Pi
 
-Copiar modelo `tools/mock/ota-agent.pi-lan.example.json` para `/etc/jukebox/ota-agent.json` e substituir `192.168.15.XXX` pelo IP real do Windows.
+Copiar modelo `tools/mock/ota-agent.pi-lan.example.json` para `/etc/jukeeo/ota-agent.json` e substituir `192.168.15.XXX` pelo IP real do Windows.
 
 ```json
 {
@@ -65,14 +65,16 @@ Copiar modelo `tools/mock/ota-agent.pi-lan.example.json` para `/etc/jukebox/ota-
   "channel": "beta",
   "ota_base_url": "http://192.168.15.42:8080",
   "current_version": "1.4.1",
-  "public_key_path": "/etc/jukebox/ota-public-key.pem"
+  "public_key_path": "/etc/jukeeo/ota-public-key.pem",
+  "kiosk_service_name": "jukeeo_kiosk_flutterpi.service",
+  "kiosk_data_dir": "/home/jukebox/.local/share/com.jukeeo.kiosk"
 }
 ```
 
 ## 6. Executar check no Pi
 
 ```bash
-/opt/jukebox/ota-agent/jukebox-ota-agent check --config /etc/jukebox/ota-agent.json
+sudo -u jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json
 ```
 
 Código de saída `2` indica actualização disponível (manifesto recebido com versão superior). Ver telemetria em `journalctl -t jukebox-ota` quando o timer systemd estiver activo.

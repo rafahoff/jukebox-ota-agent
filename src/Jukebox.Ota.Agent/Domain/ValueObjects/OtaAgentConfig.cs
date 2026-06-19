@@ -14,5 +14,6 @@ public sealed record OtaAgentConfig(
     string BackupsDir = "/opt/jukeeo/backups",
     string HealthUrl = "http://127.0.0.1:8080/api/health",
     string KioskDataDir = "",
-    int MaxReleaseFolders = 7
+    int MaxReleaseFolders = 7,
+    string StateDirectory = "/var/lib/jukebox-ota"
 );

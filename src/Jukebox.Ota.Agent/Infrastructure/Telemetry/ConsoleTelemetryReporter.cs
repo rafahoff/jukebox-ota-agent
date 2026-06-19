@@ -20,6 +20,9 @@ public sealed class ConsoleTelemetryReporter : ITelemetryReporter
             $"[telemetry] event=check device_id={deviceId} update_available={updateAvailable.ToString().ToLowerInvariant()} remote_version={remoteVersion ?? "none"}");
     }
 
+    public void ReportCheckSkipped(string deviceId, string reason) =>
+        Console.WriteLine($"[telemetry] event=check_skipped device_id={deviceId} reason={reason}");
+
     public void ReportVerifyResult(bool success, string message) =>
         Console.WriteLine($"[telemetry] event=verify success={success.ToString().ToLowerInvariant()} message={message}");
 }

@@ -19,6 +19,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
+ReadWritePaths=/home/jukebox/.local/share/com.jukeeo.kiosk/logs
 StateDirectory=jukebox-ota
 
 [Install]

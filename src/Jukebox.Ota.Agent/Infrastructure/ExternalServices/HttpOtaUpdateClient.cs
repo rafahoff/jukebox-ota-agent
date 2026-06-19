@@ -49,6 +49,17 @@ public sealed class HttpOtaUpdateClient : IOtaUpdateClient, IDisposable
         return new Uri(path);
     }
 
+    /// <summary>Endpoint usado no check (para logs do kiosk).</summary>
+    public static string DescribeCheckEndpoint(OtaAgentConfig config)
+    {
+        if (config.OtaBaseUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+        {
+            return config.OtaBaseUrl;
+        }
+
+        return BuildCheckUri(config).ToString();
+    }
+
     private static async Task<UpdateManifest?> LoadFromFileAsync(string fileUrl, CancellationToken cancellationToken)
     {
         var path = new Uri(fileUrl).LocalPath;

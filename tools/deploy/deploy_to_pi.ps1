@@ -5,7 +5,7 @@
 #   .\tools\deploy\deploy_to_pi.ps1
 #   .\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
 #   .\tools\deploy\deploy_to_pi.ps1 -SkipInstall          # só envia staging
-#   .\tools\deploy\deploy_to_pi.ps1 -SkipPublish          # não chama publish se artifacts ausente
+#   .\tools\deploy\deploy_to_pi.ps1 -SkipPublish          # usa artifacts existentes (sem rebuild)
 
 param(
     [string]$PiHost = "192.168.15.100",
@@ -91,15 +91,10 @@ Write-Host "Destino:  ${PiUser}@${PiHost}:$RemotePath"
 Write-Host "Staging:  ${PiUser}@${PiHost}:$RemoteStaging"
 Write-Host ""
 
-# --- Publish se necessário ---
+# --- Publish (rebuild antes do deploy) ---
 $binaryPath = Join-Path $ArtifactsDir $BinaryName
-if (-not (Test-Path $binaryPath)) {
-    if ($SkipPublish) {
-        Write-Host "ERRO: $binaryPath não existe. Execute:" -ForegroundColor Red
-        Write-Host "  .\tools\deploy\publish-linux-arm64.ps1" -ForegroundColor Gray
-        exit 1
-    }
-    Write-Host "Artefato ausente — executando publish..." -ForegroundColor Yellow
+if (-not $SkipPublish) {
+    Write-Host "Executando publish (linux-arm64)..." -ForegroundColor Yellow
     & $PublishScript
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERRO: publish falhou." -ForegroundColor Red
@@ -109,6 +104,10 @@ if (-not (Test-Path $binaryPath)) {
         Write-Host "ERRO: publish concluiu mas $BinaryName não foi gerado." -ForegroundColor Red
         exit 1
     }
+} elseif (-not (Test-Path $binaryPath)) {
+    Write-Host "ERRO: $binaryPath não existe. Execute:" -ForegroundColor Red
+    Write-Host "  .\tools\deploy\publish-linux-arm64.ps1" -ForegroundColor Gray
+    exit 1
 }
 
 # --- Montar staging local ---

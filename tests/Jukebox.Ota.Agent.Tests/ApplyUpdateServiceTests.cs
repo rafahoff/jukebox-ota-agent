@@ -3,6 +3,7 @@ using Jukebox.Ota.Agent.Domain.Entities;
 using Jukebox.Ota.Agent.Domain.Repositories;
 using Jukebox.Ota.Agent.Domain.Services;
 using Jukebox.Ota.Agent.Domain.ValueObjects;
+using Jukebox.Ota.Agent.Infrastructure.Policy;
 using Jukebox.Ota.Agent.Infrastructure.Backup;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.Manifest;
@@ -13,6 +14,61 @@ namespace Jukebox.Ota.Agent.Tests;
 
 public class ApplyUpdateServiceTests
 {
+    [Fact]
+    public async Task RunAsync_ForaDaJanela_RecusaSemAck()
+    {
+        var root = CreateTempLayout();
+        var configPath = WriteConfig(root);
+        var manifestPath = WriteManifest(root);
+        var packagePath = await CreatePackageAsync(root);
+
+        try
+        {
+            var ackSpy = new AckSpy();
+            var now = TimeOnly.FromDateTime(DateTime.Now);
+            var policy = new OtaCheckPolicy(
+                true,
+                6,
+                now.AddHours(2),
+                now.AddHours(4));
+            var service = BuildService(root, ackSpy, new FakeHealthChecker(success: true), policy);
+
+            var exitCode = await service.RunAsync(configPath, manifestPath, packagePath);
+
+            Assert.Equal(1, exitCode);
+            Assert.Empty(ackSpy.Payloads);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_PoliticaDesabilitada_RecusaSemAck()
+    {
+        var root = CreateTempLayout();
+        var configPath = WriteConfig(root);
+        var manifestPath = WriteManifest(root);
+        var packagePath = await CreatePackageAsync(root);
+
+        try
+        {
+            var ackSpy = new AckSpy();
+            var policy = OtaCheckPolicy.Default with { Enabled = false };
+            var service = BuildService(root, ackSpy, new FakeHealthChecker(success: true), policy);
+
+            var exitCode = await service.RunAsync(configPath, manifestPath, packagePath);
+
+            Assert.Equal(1, exitCode);
+            Assert.Empty(ackSpy.Payloads);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task RunAsync_SemPackage_RetornaErroEAck()
     {
@@ -95,8 +151,13 @@ public class ApplyUpdateServiceTests
         }
     }
 
-    private static ApplyUpdateService BuildService(string root, AckSpy ackSpy, IHealthChecker healthChecker)
+    private static ApplyUpdateService BuildService(
+        string root,
+        AckSpy ackSpy,
+        IHealthChecker healthChecker,
+        OtaCheckPolicy? policy = null)
     {
+        var effectivePolicy = policy ?? OtaCheckPolicy.Default;
         var config = new OtaAgentConfig(
             "machine-test",
             "beta",
@@ -123,7 +184,13 @@ public class ApplyUpdateServiceTests
             releaseManager,
             new FileSystemBackupService(),
             healthChecker,
-            ackSpy);
+            ackSpy,
+            new FakePolicyProvider(effectivePolicy));
+    }
+
+    private sealed class FakePolicyProvider(OtaCheckPolicy policy) : Domain.Services.IOtaPolicyProvider
+    {
+        public OtaCheckPolicy GetPolicy(OtaAgentConfig config) => policy;
     }
 
     private static void SeedCurrentRelease(string root, OtaAgentConfig config)

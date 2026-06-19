@@ -72,6 +72,22 @@ ensure_ota_user() {
   chmod 750 "$STATE_DIR"
 }
 
+ensure_kiosk_user_in_ota_group() {
+  if ! id "$KIOSK_USER" &>/dev/null; then
+    log "AVISO: utilizador kiosk ${KIOSK_USER} ausente — omitindo usermod"
+    return 0
+  fi
+
+  if id -nG "$KIOSK_USER" | tr ' ' '\n' | grep -qx "$OTA_GROUP"; then
+    log "Utilizador ${KIOSK_USER} já está no grupo ${OTA_GROUP}."
+    return 0
+  fi
+
+  log "Adicionando ${KIOSK_USER} ao grupo ${OTA_GROUP} (builder OTA em ota/out)..."
+  usermod -aG "$OTA_GROUP" "$KIOSK_USER"
+  log "Nova sessão SSH do builder necessária para o grupo fazer efeito."
+}
+
 apply_install_permissions() {
   log "Aplicando permissões (${OTA_USER} sem escrita em binário/config)..."
 
@@ -103,6 +119,7 @@ apply_jukeeo_ota_layout_permissions() {
   local dirs=(
     releases
     backups
+    ota
     ota/incoming
     ota/staging
     ota/out
@@ -160,6 +177,37 @@ apply_kiosk_data_read_acl() {
   done
   setfacl -R -m "u:${OTA_USER}:rx" "$data_dir"
   find "$data_dir" -type f -exec setfacl -m "u:${OTA_USER}:r" {} + 2>/dev/null || true
+}
+
+apply_kiosk_logs_write_acl() {
+  local logs_dir="/home/${KIOSK_USER}/.local/share/com.jukeeo.kiosk/logs"
+  local kiosk_share="/home/${KIOSK_USER}/.local/share/com.jukeeo.kiosk"
+
+  ensure_acl_package
+
+  if [[ ! -d "$kiosk_share" ]]; then
+    log "AVISO: diretório kiosk ausente (${kiosk_share}) — ACL de logs omitida"
+    return 0
+  fi
+
+  if ! command -v setfacl >/dev/null 2>&1; then
+    log "AVISO: setfacl ainda indisponível — escrita de logs OTA pode falhar"
+    return 0
+  fi
+
+  log "ACL de escrita para ${OTA_USER} em ${logs_dir}..."
+  mkdir -p "$logs_dir"
+  chown "${KIOSK_USER}:${KIOSK_USER}" "$logs_dir"
+  chmod 755 "$logs_dir"
+  setfacl -m "u:${OTA_USER}:rwX" "$logs_dir"
+  setfacl -d -m "u:${OTA_USER}:rw" "$logs_dir" 2>/dev/null || true
+  # Ficheiros criados pelo agente OTA devem ser legíveis pelo kiosk na debug screen.
+  setfacl -m "u:${KIOSK_USER}:r" "$logs_dir"
+  setfacl -d -m "u:${KIOSK_USER}:r" "$logs_dir" 2>/dev/null || true
+  if [[ -f "${logs_dir}/jukebox_ota_agent.log" ]]; then
+    setfacl -m "u:${KIOSK_USER}:r" "${logs_dir}/jukebox_ota_agent.log" 2>/dev/null || true
+    chmod a+r "${logs_dir}/jukebox_ota_agent.log" 2>/dev/null || true
+  fi
 }
 
 normalize_ota_config() {
@@ -279,6 +327,8 @@ BINARY_NAME="jukebox-ota-agent"
 
 ensure_ota_user
 
+ensure_kiosk_user_in_ota_group
+
 log "Instalando binário em ${INSTALL_DIR}..."
 mkdir -p "$INSTALL_DIR"
 cp -a "${ARTIFACTS_DIR}/." "${INSTALL_DIR}/"
@@ -287,6 +337,7 @@ apply_install_permissions
 
 apply_jukeeo_ota_layout_permissions
 apply_kiosk_data_read_acl
+apply_kiosk_logs_write_acl
 install_sudoers
 
 if [[ -d "$SYSTEMD_DIR" ]]; then

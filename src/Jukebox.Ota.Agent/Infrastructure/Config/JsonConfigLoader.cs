@@ -37,7 +37,8 @@ public sealed class JsonConfigLoader
             dto.BackupsDir ?? "/opt/jukeeo/backups",
             dto.HealthUrl ?? "http://127.0.0.1:8080/api/health",
             dto.KioskDataDir ?? string.Empty,
-            dto.MaxReleaseFolders ?? 7);
+            dto.MaxReleaseFolders ?? 7,
+            dto.StateDirectory ?? "/var/lib/jukebox-ota");
     }
 
     internal static string NormalizeKioskServiceName(string? name)
@@ -86,5 +87,8 @@ public sealed class JsonConfigLoader
 
         [JsonPropertyName("max_release_folders")]
         public int? MaxReleaseFolders { get; set; }
+
+        [JsonPropertyName("state_directory")]
+        public string? StateDirectory { get; set; }
     }
 }
