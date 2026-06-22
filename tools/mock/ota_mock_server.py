@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Servidor HTTP mock para a API OTA do jukebox-ota-agent (POC Fase 4).
+DEPRECADO — usar jukebox-ota-server-dev (Docker).
 
-Uso:
+Servidor HTTP mock para a API OTA do jukebox-ota-agent (POC Fase 4).
+Substituído por jukebox-ota-server-dev. Mantido apenas como referência histórica.
+
+Uso legado:
   python tools/mock/ota_mock_server.py
   python tools/mock/ota_mock_server.py --mode has-update
   python tools/mock/ota_mock_server.py --mode auto --manifest tools/mock/manifest.example.json

@@ -20,7 +20,9 @@ Agente de atualização over-the-air (OTA) para quiosques Jukeeo — processo **
 | **Runtime Pi** | Utilizador `jukebox-ota`, units systemd + timer (`packaging/systemd/`), sudoers restrito para `systemctl` do kiosk |
 | **Observabilidade** | Stdout → journald (`SyslogIdentifier=jukebox-ota`); log opcional em ficheiro |
 
-**Fora deste repo (backlog ou futuro):** servidor OTA completo (`jukebox-ota-server`), pipeline fleet off-device ([JUK-71](https://linear.app/jukeeo/issue/JUK-71)), TLS agente↔servidor ([JUK-73](https://linear.app/jukeeo/issue/JUK-73)), auto-update do próprio binário do agente.
+**Fora deste repo (backlog ou futuro):** servidor OTA produção JUK-72 (`jukebox-ota-server`), pipeline fleet off-device ([JUK-71](https://linear.app/jukeeo/issue/JUK-71)), TLS agente↔servidor ([JUK-73](https://linear.app/jukeeo/issue/JUK-73)), auto-update do próprio binário do agente.
+
+**Servidor OTA de desenvolvimento:** [`jukebox-ota-server-dev`](https://github.com/rafahoff/jukebox-ota-server-dev) (Docker, paliativo para testes).
 
 **Repo irmão:** app Flutter [`jukebox_tv`](https://github.com/rafahoff/jukebox_tv).
 
@@ -134,7 +136,7 @@ Documentação detalhada do script: [`tools/README.md`](tools/README.md#deploy_t
 | `src/Jukebox.Ota.Agent/Interfaces/Cli/` | Entrada CLI |
 | `tests/Jukebox.Ota.Agent.Tests/` | xUnit |
 | `tools/deploy/` | Publish e deploy no Pi |
-| `tools/mock/` | Servidor HTTP mock e fixtures JSON |
+| `tools/mock/` | Fixtures JSON; mock HTTP **deprecado** — usar `jukebox-ota-server-dev` |
 
 ## Documentação
 

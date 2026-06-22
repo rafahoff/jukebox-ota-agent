@@ -30,7 +30,8 @@ Pacote `jukeeo-<versão>+aarch64.tar.zst` com bundle flutter-pi completo (v1: s�
 |------|-------|
 | `jukebox-ota-agent` | Binário em `/opt/jukeeo/ota-agent/` |
 | `jukebox_tv` | App kiosk + `tools/ota/` (empacotamento) |
-| `jukebox-ota-server` | API de rollout (futuro) |
+| `jukebox-ota-server-dev` | Servidor OTA paliativo de desenvolvimento (Docker) |
+| *(futuro)* `jukebox-ota-server` | API de rollout produção (JUK-72) |
 | `jukeeo-knowledge` | Brainstorm e decisões de produto |
 
 Plano de execução: `jukebox_tv/docs/plans/PLANO_OTA_EXECUCAO_PI.md`. UI e estado partilhado: `jukebox_tv/docs/plans/PLANO_OTA_UI_SETTINGS.md` (ADR 0001).
