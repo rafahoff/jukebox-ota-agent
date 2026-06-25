@@ -1,8 +1,8 @@
 # Gerido por pi_install_ota.sh — não editar à mão no Pi.
-# Permite ao kiosk (utilizador jukebox) disparar check/upgrade OTA como jukebox-ota.
+# Permite ao kiosk (utilizador jukebox) disparar check/upgrade OTA.
 Defaults:jukebox !requiretty
-Cmnd_Alias JUKEEO_OTA_CHECK = /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json, \
-    /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json --force
-Cmnd_Alias JUKEEO_OTA_UPGRADE = /opt/jukeeo/ota-agent/jukebox-ota-agent upgrade --config /etc/jukeeo/ota-agent.json, \
-    /opt/jukeeo/ota-agent/jukebox-ota-agent upgrade --config /etc/jukeeo/ota-agent.json --force
-jukebox ALL=(jukebox-ota) NOPASSWD: JUKEEO_OTA_CHECK, JUKEEO_OTA_UPGRADE
+Cmnd_Alias JUKEEO_OTA_CHECK = /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json, /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json --force
+# Upgrade via systemd-run (slice system): filho directo do kiosk morre ao parar jukeeo_kiosk_flutterpi.
+Cmnd_Alias JUKEEO_OTA_UPGRADE = /bin/systemd-run --unit=jukebox-ota-upgrade-manual --collect -p User=jukebox-ota -p Group=jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent upgrade --config /etc/jukeeo/ota-agent.json --force
+jukebox ALL=(jukebox-ota) NOPASSWD: JUKEEO_OTA_CHECK
+jukebox ALL=(root) NOPASSWD: JUKEEO_OTA_UPGRADE
