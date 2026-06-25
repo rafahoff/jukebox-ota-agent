@@ -44,7 +44,14 @@ public sealed class FileSystemBackupService : IBackupService
 
     public void CollectGarbage(string backupsDir, int maxFolders)
     {
-        FolderGarbageCollector.Collect(backupsDir, new HashSet<string>(StringComparer.Ordinal), maxFolders);
+        try
+        {
+            FolderGarbageCollector.Collect(backupsDir, new HashSet<string>(StringComparer.Ordinal), maxFolders);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"AVISO: GC de backups falhou: {ex.Message}");
+        }
     }
 
     public static string ResolveKioskDataDir(OtaAgentConfig config)

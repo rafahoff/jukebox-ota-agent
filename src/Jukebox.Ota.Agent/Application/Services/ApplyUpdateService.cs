@@ -166,8 +166,7 @@ public sealed class ApplyUpdateService
                 return 1;
             }
 
-            _releaseManager.CollectGarbage(config);
-            _backupService.CollectGarbage(config.BackupsDir, config.MaxReleaseFolders);
+            CollectGarbageSafely(config);
 
             await SendAckAsync(config, manifest, versionPrevious, manifest.Version, "success", null, null, cancellationToken);
             try
@@ -218,6 +217,21 @@ public sealed class ApplyUpdateService
             }
 
             return 1;
+        }
+    }
+
+    /// GC após health OK — falha de permissão em backup antigo não deve invalidar o apply.
+    private void CollectGarbageSafely(OtaAgentConfig config)
+    {
+        try
+        {
+            _releaseManager.CollectGarbage(config);
+            _backupService.CollectGarbage(config.BackupsDir, config.MaxReleaseFolders);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"AVISO: GC após apply falhou (apply já validado): {ex.Message}");
+            FileAgentLogger.LogApply($"AVISO: GC após apply ignorado: {ex.Message}");
         }
     }
 
