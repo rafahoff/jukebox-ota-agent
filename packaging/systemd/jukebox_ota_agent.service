@@ -1,5 +1,5 @@
 [Unit]
-Description=Jukebox OTA Agent — verificação e aplicação de atualização
+Description=Jukebox OTA Agent — verificação de atualização
 After=network-online.target
 Wants=network-online.target
 
@@ -7,21 +7,22 @@ Wants=network-online.target
 Type=oneshot
 User=jukebox-ota
 Group=jukebox-ota
-# Respeita política SQLite (intervalo, janela, enabled); se houver update, faz download + apply.
-ExecStart=/opt/jukeeo/ota-agent/jukebox-ota-agent upgrade --config /etc/jukeeo/ota-agent.json
-SuccessExitStatus=0
+# ADR 0002: timer só check (HTTP + download + verify → ready_to_apply).
+# Apply automático fica a cargo do kiosk após grace period; manual via systemd-run upgrade.
+ExecStart=/opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json
+# POC: exit 2 = update disponível (não é falha); exit 1 = erro real
+SuccessExitStatus=0 2
 SyslogIdentifier=jukebox-ota
 StandardOutput=journal
 StandardError=journal
 
-# apply usa sudo -n systemctl (sudoers) — NoNewPrivileges impediria elevação.
-NoNewPrivileges=no
+NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
-# Política OTA + estado partilhado com o kiosk; apply grava releases/backups e symlinks em /opt/jukeeo.
-ReadWritePaths=/home/jukebox/.local/share/com.jukeeo.kiosk/logs /home/jukebox/.local/share/com.jukeeo.kiosk /opt/jukeeo/releases /opt/jukeeo/backups /opt/jukeeo
+ReadWritePaths=/home/jukebox/.local/share/com.jukeeo.kiosk/logs /home/jukebox/.local/share/com.jukeeo.kiosk /var/lib/jukebox-ota
 StateDirectory=jukebox-ota
+StateDirectoryMode=0750
 
 [Install]
 WantedBy=multi-user.target

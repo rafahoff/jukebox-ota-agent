@@ -1,6 +1,6 @@
 # ADR 0001 — Estado OTA partilhado (`ota_update_status.json`) e comando `upgrade`
 
-**Status:** aceito  
+**Status:** aceito (emendado parcialmente pelo [ADR 0002](0002-ota-check-download-e-grace-period-kiosk.md))  
 **Data:** 2026-06-19
 
 ## Contexto
@@ -114,6 +114,7 @@ Decisão de produto registada aqui para alinhamento entre repos; implementação
 
 ## Ver também
 
+- [ADR 0002](0002-ota-check-download-e-grace-period-kiosk.md) — emenda semântica de `check`/`upgrade`, fase `ready_to_apply`, timer só `check`
 - `jukebox_tv/docs/plans/PLANO_OTA_EXECUCAO_PI.md` — layout `/opt/jukeeo`, apply, rollback
 - `docs/API.md` — contrato HTTP e política `machine_config` actual
 - [[PLANO_OTA_RASPBERRY_PI_SERVIDOR_PROPRIO]] — visão de produto OTA

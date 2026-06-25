@@ -124,7 +124,7 @@ Ficheiro legível pelo kiosk Flutter no diretório de dados persistentes:
 
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
-| `phase` | string | `idle` \| `checking` \| `update_available` \| `downloading` \| `applying` \| `error` |
+| `phase` | string | `idle` \| `checking` \| `update_available` *(legado)* \| `downloading` \| `ready_to_apply` \| `applying` \| `error` |
 | `checked_at_ms` | int \| null | Epoch ms da última verificação HTTP concluída (com ou sem update) |
 | `current_version` | string | Versão instalada no momento da escrita |
 | `remote_version` | string \| null | Versão oferecida pelo servidor |
@@ -145,11 +145,10 @@ O toggle «Verificar atualizações automaticamente» no kiosk afecta o timer sy
 
 ### `upgrade`
 
-Orquestração: `check` (forçado se `--force`) → download do pacote → `apply` → actualiza JSON em cada fase.
+Orquestração **apply-only**: lê cache em `{state_directory}/downloads/` e invoca `apply`.
 
-- Download via `download_url` no manifesto ou path derivado (`file://` fixture ou `{ota_base_url}/ota/{app}/{version}/{arch}/jukeeo-{version}+{arch}.tar.zst`).
-- Pacotes descarregados em `{state_directory}/downloads/`.
-- Exit **0** sucesso · **1** erro · **2** não aplicável (herdado do check quando há update mas apply falha retorna **1**).
+- Pré-requisito: `check` prévio com `phase=ready_to_apply` (pacote verificado em cache).
+- Exit **0** sucesso ou nada a aplicar · **1** erro (inclui recusa A2: cache ≠ `remote_version`).
 
 ### `sign-manifest`
 
@@ -206,17 +205,30 @@ Chaves na tabela `machine_config` do ficheiro `jukebox_library.db` (diretório `
 
 Se o SQLite estiver ausente ou a leitura falhar, usam-se os defaults (check habilitado, janela dia inteiro).
 
-### Comportamento `check` (antes do HTTP)
+### Comportamento `check`
 
 1. Carregar política (SQLite ou defaults).
 2. Se `ota_check_enabled=false` → log + telemetria `check_skipped` → **exit 0**.
 3. Se fora da janela horária (hora local) → skip → **exit 0**.
 4. Se `now - checked_at_ms < interval_minutes` → skip → **exit 0** (`ota_update_status.json` em `kiosk_data_dir`).
-5. Senão executar verificação HTTP; em sucesso (com ou sem update) actualizar `checked_at_ms` no JSON.
+5. Senão executar verificação HTTP.
+6. Se houver update: **download** do pacote + manifesto em `{state_directory}/downloads/`, verificação SHA-256/assinatura, `phase=ready_to_apply` (ou `error` se falhar).
+7. Em sucesso sem update ou após download verificado, actualizar `checked_at_ms`.
 
 Com `--force`, os passos 2–4 são ignorados.
 
-Exit **2** mantém-se quando há update disponível. Falhas reais → exit **1**.
+Exit **2** mantém-se quando há update disponível e pacote verificado (`ready_to_apply`). Falhas reais → exit **1**.
+
+### `upgrade` (apply-only)
+
+Usa pacote **já em cache** (`{state_directory}/downloads/`): manifesto `jukeeo-{version}-manifest.json` + `jukeeo-{version}+{arch}.tar.zst`.
+
+- **Não** repete HTTP check/download se o cache estiver pronto e `manifest.version == remote_version` no status.
+- **Recusa apply (exit 1)** se versão no manifesto em cache ≠ `remote_version` no JSON (regra A2).
+- Delega a `apply` via `ApplyUpdateService` (política de janela/`ota_check_enabled` mantida, salvo `--force`).
+- Exit **0** quando não há pacote pronto · **0** após apply bem-sucedido · **1** erro.
+
+Fluxo operacional recomendado (timer systemd): `check` (descarrega) seguido de `upgrade` (aplica) — ou script wrapper equivalente.
 
 ### Comportamento `apply`
 

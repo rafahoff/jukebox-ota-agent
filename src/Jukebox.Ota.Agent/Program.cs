@@ -56,7 +56,15 @@ try
     var statusStore = new FileOtaUpdateStatusStore();
 
     var versionService = new VersionService();
-    var checkService = new CheckUpdateService(configLoader, versionSync, otaClient, telemetry, policyProvider, statusStore);
+    var checkService = new CheckUpdateService(
+        configLoader,
+        versionSync,
+        otaClient,
+        telemetry,
+        policyProvider,
+        statusStore,
+        packageVerifier,
+        manifestWriter);
     var verifyService = new VerifyPackageService(manifestLoader, packageVerifier, telemetry);
     var signManifestService = new SignManifestService(manifestLoader, manifestWriter, manifestSigner);
     var applyService = new ApplyUpdateService(
@@ -73,11 +81,9 @@ try
         statusStore);
     var upgradeService = new UpgradeUpdateService(
         configLoader,
-        checkService,
         applyService,
-        otaClient,
         statusStore,
-        manifestWriter);
+        manifestLoader);
 
     var cli = new AgentCli(
         versionService,

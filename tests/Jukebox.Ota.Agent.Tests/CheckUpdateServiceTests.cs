@@ -2,8 +2,10 @@ using Jukebox.Ota.Agent.Application.Services;
 using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
+using Jukebox.Ota.Agent.Infrastructure.Manifest;
 using Jukebox.Ota.Agent.Infrastructure.Policy;
 using Jukebox.Ota.Agent.Infrastructure.Release;
+using Jukebox.Ota.Agent.Infrastructure.Security;
 using Jukebox.Ota.Agent.Infrastructure.Telemetry;
 
 namespace Jukebox.Ota.Agent.Tests;
@@ -11,68 +13,52 @@ namespace Jukebox.Ota.Agent.Tests;
 public class CheckUpdateServiceTests
 {
     [Fact]
-    public async Task RunAsync_ComFixtureLocal_RetornaAtualizacaoDisponivel()
+    public async Task RunAsync_ComFixtureLocal_BaixaPacoteERetornaReadyToApply()
     {
-        var manifestPath = Path.Combine(Path.GetTempPath(), $"ota-manifest-{Guid.NewGuid():N}.json");
-        var configPath = Path.Combine(Path.GetTempPath(), $"ota-config-{Guid.NewGuid():N}.json");
-        var kioskData = Path.Combine(Path.GetTempPath(), $"ota-kiosk-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(kioskData);
-
-        File.WriteAllText(manifestPath, """
-            {
-              "app": "jukeeo",
-              "version": "1.4.2",
-              "arch": "aarch64",
-              "sha256": "abc123",
-              "signature_b64": "",
-              "signature_algorithm": "rsa-pss-sha256",
-              "released_at": "2026-06-12T12:00:00Z"
-            }
-            """);
-
-        var fileUrl = new Uri(manifestPath).AbsoluteUri;
-        File.WriteAllText(configPath, $$"""
-            {
-              "device_id": "machine-001",
-              "channel": "beta",
-              "ota_base_url": "{{fileUrl}}",
-              "current_version": "1.4.1",
-              "public_key_path": "",
-              "kiosk_data_dir": "{{kioskData.Replace("\\", "\\\\")}}"
-            }
-            """);
+        var root = Path.Combine(Path.GetTempPath(), $"ota-check-{Guid.NewGuid():N}");
 
         try
         {
+            var fixture = await OtaTestFixture.CreateAsync(root);
             using var client = new HttpOtaUpdateClient();
-            var service = new CheckUpdateService(
-                new JsonConfigLoader(),
-                new OtaConfigVersionSync(new JsonConfigWriter(), new FileSystemReleaseManager()),
-                client,
-                new ConsoleTelemetryReporter(),
-                new AlwaysAllowPolicyProvider(),
-                new FileOtaUpdateStatusStore());
+            var service = BuildService(client);
 
-            var exitCode = await service.RunAsync(configPath);
+            var exitCode = await service.RunAsync(fixture.ConfigPath);
 
             Assert.Equal(2, exitCode);
 
+            var config = new JsonConfigLoader().Load(fixture.ConfigPath);
             var statusStore = new FileOtaUpdateStatusStore();
-            var config = new JsonConfigLoader().Load(configPath);
             var status = statusStore.Read(config);
             Assert.True(status.UpdateAvailable);
-            Assert.Equal("1.4.2", status.RemoteVersion);
+            Assert.Equal(fixture.RemoteVersion, status.RemoteVersion);
+            Assert.Equal(OtaUpdatePhases.ReadyToApply, status.Phase);
+
+            var downloadDir = OtaDownloadCache.GetDownloadDirectory(config);
+            Assert.True(Directory.Exists(downloadDir));
+            Assert.True(File.Exists(OtaDownloadCache.GetManifestPath(config, fixture.RemoteVersion)));
+            Assert.True(File.Exists(OtaDownloadCache.GetPackagePath(config, new Domain.Entities.UpdateManifest(
+                "jukeeo", fixture.RemoteVersion, "aarch64", "", "", "rsa-pss-sha256", DateTimeOffset.UtcNow))));
         }
         finally
         {
-            File.Delete(manifestPath);
-            File.Delete(configPath);
-            if (Directory.Exists(kioskData))
+            if (Directory.Exists(root))
             {
-                Directory.Delete(kioskData, recursive: true);
+                Directory.Delete(root, recursive: true);
             }
         }
     }
+
+    private static CheckUpdateService BuildService(HttpOtaUpdateClient client) =>
+        new(
+            new JsonConfigLoader(),
+            new OtaConfigVersionSync(new JsonConfigWriter(), new FileSystemReleaseManager()),
+            client,
+            new ConsoleTelemetryReporter(),
+            new AlwaysAllowPolicyProvider(),
+            new FileOtaUpdateStatusStore(),
+            new RsaPssPackageVerifier(),
+            new JsonManifestWriter());
 
     private sealed class AlwaysAllowPolicyProvider : Domain.Services.IOtaPolicyProvider
     {

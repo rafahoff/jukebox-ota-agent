@@ -52,14 +52,20 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 - [2026-06-19] **Backup pré-update no apply**
   Faça assim: origem `kiosk_data_dir` (`jukebox_library.db` + wal/shm + `shared_preferences.json`); destino `/opt/jukeeo/backups/pre-{versão}-{ts UTC}/`; `IBackupService` em `Infrastructure/Backup/FileSystemBackupService.cs`; rollback automático **não** restaura DB — ver `README.md` § Backup e `docs/API.md` § apply.
 
-- [2026-06-25] **Timer systemd executa `upgrade` (não só `check`)**
-  Faça assim: `jukebox_ota_agent.service` → `upgrade --config /etc/jukeeo/ota-agent.json`; respeita política SQLite; aplica update dentro da janela. `SuccessExitStatus=0` apenas.
+- [2026-06-25] **Download OTA — permissões `/var/lib/jukebox-ota/downloads/`**
+  Faça assim: cache em `{state_directory}/downloads/` (plural, ADR 0002). Timer systemd corre como `jukebox-ota`; «Verificar agora» no kiosk corria como `jukebox` → **Access denied** ao gravar pacote. Correcção: `pi_install_ota.sh` cria `downloads/` com `chmod 2770` (grupo `jukebox-ota`); sudoers `99-jukebox-kiosk-ota-check` permite `sudo -n -u jukebox-ota … check`; unit com `ReadWritePaths=/var/lib/jukebox-ota`. Validar: `sudo -u jukebox touch /var/lib/jukebox-ota/downloads/.write-test` (membro do grupo) **e** `sudo -n -u jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json --force` como `jukebox`.
 
-- [2026-06-25] **ProtectHome e política OTA no timer**
-  Faça assim: unit com `ProtectHome=read-only` + `ReadWritePaths` em `kiosk_data_dir`, `/opt/jukeeo/releases`, `/opt/jukeeo/backups`, `/opt/jukeeo`. Sem leitura do SQLite → intervalo default 30 min (ignora UI 5 min). `NoNewPrivileges=no` para `sudo -n systemctl` no apply.
+- [2026-06-25] **Refactor check/upgrade (apply-only) — ADR 0002**
+  Faça assim: `check` = HTTP + download + verificação → `phase=ready_to_apply` em `{state_directory}/downloads/`; `upgrade` = apply-only do cache (sem novo HTTP). Regra A2: recusa apply se versão em cache ≠ `remote_version`.
+
+- [2026-06-25] **Timer systemd só `check` (ADR 0002)**
+  Faça assim: `jukebox_ota_agent.service` → `check --config /etc/jukeeo/ota-agent.json`; `SuccessExitStatus=0 2`. Apply automático: kiosk após grace period (`systemd-run upgrade`); apply manual: Definições → «Actualizar agora».
+
+- [2026-06-25] **ProtectHome e política OTA no timer (check)**
+  Faça assim: unit check com `ProtectHome=read-only` + `ReadWritePaths` em `kiosk_data_dir` e logs. Sem leitura do SQLite → intervalo default 30 min (ignora UI 5 min). Unit de `upgrade` (systemd-run) precisa `NoNewPrivileges=no` e paths `/opt/jukeeo/*` — ver sudoers apply.
 
 - [2026-06-19] **Estado OTA partilhado (ADR 0001)**
-  Faça assim: `{kiosk_data_dir}/ota_update_status.json` (schema v1); `checked_at_ms` substitui `last_check_at_ms` em `state_directory`; migração one-shot automática; `check|upgrade|apply --force` ignora política SQLite; `upgrade` = check → download (`{state_directory}/downloads/`) → apply.
+  Faça assim: `{kiosk_data_dir}/ota_update_status.json` (schema v1); fases incluem `ready_to_apply` após check; `check|upgrade|apply --force` ignora política SQLite; `check` = download + verify; `upgrade` = apply-only do cache.
 
 - [2026-06-12] **Logs separados do kiosk**
   Faça assim: unit com `SyslogIdentifier=jukebox-ota`; validar com `journalctl -t jukebox-ota`. Arquivo compartilhado: `/home/jukebox/.local/share/com.jukeeo.kiosk/logs/jukebox_ota_agent.log` (rotação 5 MB × 5, `FileAgentLogger`); Windows dev: `%APPDATA%\com.jukeeo\kiosk\logs\`. Unit precisa `ReadWritePaths` nessa pasta; `pi_install_ota.sh` aplica ACL escrita `jukebox-ota` + leitura default `jukebox` (debug screen). Falhas de check no arquivo usam `OtaCheckErrorFormatter` (PT); journald mantém mensagem técnica em inglês.
@@ -68,7 +74,7 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
   Faça assim: `jukebox_ota_agent.service` tipo `oneshot` + `jukebox_ota_agent.timer` (10min); reduz RAM idle no Pi.
 
 - [2026-06-18] **Exit 2 no check ≠ falha systemd**
-  Faça assim: só relevante para `check` manual; o timer usa `upgrade` (exit 0 sucesso, 1 erro). Validar com `journalctl -t jukebox-ota` após `systemctl start jukebox_ota_agent.service`.
+  Faça assim: timer invoca `check`; exit 2 = update pronto (`ready_to_apply`), não é failed. Validar com `journalctl -t jukebox-ota` após `systemctl start jukebox_ota_agent.service`.
 
 ## Segurança
 

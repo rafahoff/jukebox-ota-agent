@@ -26,6 +26,7 @@ JUKEEO_ROOT="/opt/jukeeo"
 KIOSK_SERVICE="jukeeo_kiosk_flutterpi.service"
 KIOSK_USER="jukebox"
 SUDOERS_DEST="/etc/sudoers.d/99-jukebox-ota-systemctl"
+KIOSK_SUDOERS_DEST="/etc/sudoers.d/99-jukebox-kiosk-ota-check"
 ENABLE_TIMER=false
 FORCE_CONFIG=false
 
@@ -70,6 +71,16 @@ ensure_ota_user() {
   mkdir -p "$STATE_DIR"
   chown "${OTA_USER}:${OTA_GROUP}" "$STATE_DIR"
   chmod 750 "$STATE_DIR"
+}
+
+ensure_state_downloads_layout() {
+  log "Cache OTA em ${STATE_DIR}/downloads/ (grupo ${OTA_GROUP}, setgid)..."
+
+  mkdir -p "${STATE_DIR}/downloads"
+  chown "${OTA_USER}:${OTA_GROUP}" "${STATE_DIR}" "${STATE_DIR}/downloads"
+  chmod 750 "${STATE_DIR}"
+  # Membros do grupo (ex.: jukebox no check manual) podem gravar; novos ficheiros herdam o grupo.
+  chmod 2770 "${STATE_DIR}/downloads"
 }
 
 ensure_kiosk_user_in_ota_group() {
@@ -282,23 +293,43 @@ if changed:
 PY
 }
 
-install_sudoers() {
-  local template="${STAGING_DIR}/sudoers/jukebox-ota-systemctl.template"
+install_sudoers_fragment() {
+  local template="$1"
+  local dest="$2"
+  local label="$3"
+
   [[ -f "$template" ]] || die "template sudoers ausente em ${template} — execute deploy_to_pi.ps1"
 
-  log "Instalando sudoers (${OTA_USER} → systemctl ${KIOSK_SERVICE})..."
+  log "Instalando sudoers (${label})..."
 
-  local tmp="${SUDOERS_DEST}.tmp"
+  local tmp="${dest}.tmp"
   sed "s/@KIOSK_SERVICE@/${KIOSK_SERVICE}/g" "$template" | tr -d '\r' > "$tmp"
   chmod 440 "$tmp"
 
   if command -v visudo >/dev/null 2>&1; then
-    visudo -c -f "$tmp" || die "fragmento sudoers inválido"
+    visudo -c -f "$tmp" || die "fragmento sudoers inválido: ${dest}"
   else
     log "AVISO: visudo ausente — validação do sudoers omitida"
   fi
 
-  mv "$tmp" "$SUDOERS_DEST"
+  mv "$tmp" "$dest"
+}
+
+install_sudoers() {
+  install_sudoers_fragment \
+    "${STAGING_DIR}/sudoers/jukebox-ota-systemctl.template" \
+    "$SUDOERS_DEST" \
+    "${OTA_USER} → systemctl ${KIOSK_SERVICE}"
+
+  local kiosk_template="${STAGING_DIR}/sudoers/jukebox-kiosk-ota-check.template"
+  if [[ -f "$kiosk_template" ]]; then
+    install_sudoers_fragment \
+      "$kiosk_template" \
+      "$KIOSK_SUDOERS_DEST" \
+      "${KIOSK_USER} → check OTA como ${OTA_USER}"
+  else
+    log "AVISO: template kiosk sudoers ausente — check manual do kiosk pode falhar em downloads/"
+  fi
 }
 
 die() {
@@ -359,6 +390,7 @@ BINARY_NAME="jukebox-ota-agent"
 [[ -f "${ARTIFACTS_DIR}/${BINARY_NAME}" ]] || die "binário ${BINARY_NAME} não encontrado em ${ARTIFACTS_DIR}"
 
 ensure_ota_user
+ensure_state_downloads_layout
 
 ensure_kiosk_user_in_ota_group
 
@@ -403,6 +435,7 @@ if [[ -f "$CONFIG_PATH" ]]; then
 fi
 
 apply_install_permissions
+ensure_state_downloads_layout
 
 log "Recarregando systemd..."
 systemctl daemon-reload

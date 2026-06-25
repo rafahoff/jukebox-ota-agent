@@ -133,6 +133,7 @@ Copy-Item -Force (Join-Path $Root "packaging\systemd\jukebox_ota_agent.timer") $
 New-Item -ItemType Directory -Path $stagingConfig -Force | Out-Null
 Copy-Item -Force (Join-Path $Root "tools\mock\ota-agent.example.json") (Join-Path $stagingConfig "ota-agent.example.json")
 Copy-Item -Force (Join-Path $Root "packaging\sudoers\jukebox-ota-systemctl.template") (Join-Path $stagingSudoers "jukebox-ota-systemctl.template")
+Copy-Item -Force (Join-Path $Root "packaging\sudoers\jukebox-kiosk-ota-check.template") (Join-Path $stagingSudoers "jukebox-kiosk-ota-check.template")
 Copy-Item -Force $InstallScript (Join-Path $StagingDir "pi_install_ota.sh")
 
 Set-UnixLineEndings @(
@@ -140,6 +141,7 @@ Set-UnixLineEndings @(
     $InstallScript
     (Join-Path $StagingDir "pi_install_ota.sh")
     (Join-Path $stagingSudoers "jukebox-ota-systemctl.template")
+    (Join-Path $stagingSudoers "jukebox-kiosk-ota-check.template")
     (Join-Path $stagingSystemd "jukebox_ota_agent.service")
     (Join-Path $stagingSystemd "jukebox_ota_agent.timer")
 )

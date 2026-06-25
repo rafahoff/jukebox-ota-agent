@@ -4,8 +4,10 @@ using Jukebox.Ota.Agent.Domain.Services;
 using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
+using Jukebox.Ota.Agent.Infrastructure.Manifest;
 using Jukebox.Ota.Agent.Infrastructure.Policy;
 using Jukebox.Ota.Agent.Infrastructure.Release;
+using Jukebox.Ota.Agent.Infrastructure.Security;
 using Jukebox.Ota.Agent.Infrastructure.Telemetry;
 
 namespace Jukebox.Ota.Agent.Tests;
@@ -86,25 +88,11 @@ public class CheckUpdateServicePolicyTests
     [Fact]
     public async Task RunAsync_CheckBemSucedido_AtualizaCheckedAtMs()
     {
-        var manifestPath = Path.Combine(Path.GetTempPath(), $"ota-manifest-{Guid.NewGuid():N}.json");
         var root = Path.Combine(Path.GetTempPath(), $"ota-policy-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(root);
-        var configPath = WriteConfigWithKioskData(root, manifestPath);
-
-        File.WriteAllText(manifestPath, """
-            {
-              "app": "jukeeo",
-              "version": "1.4.2",
-              "arch": "aarch64",
-              "sha256": "abc123",
-              "signature_b64": "",
-              "signature_algorithm": "rsa-pss-sha256",
-              "released_at": "2026-06-12T12:00:00Z"
-            }
-            """);
 
         try
         {
+            var fixture = await OtaTestFixture.CreateAsync(root);
             using var client = new HttpOtaUpdateClient();
             var statusStore = new FileOtaUpdateStatusStore();
             var service = new CheckUpdateService(
@@ -113,17 +101,19 @@ public class CheckUpdateServicePolicyTests
                 client,
                 new ConsoleTelemetryReporter(),
                 new FakePolicyProvider(OtaCheckPolicy.Default with { IntervalMinutes = 15 }),
-                statusStore);
+                statusStore,
+                new RsaPssPackageVerifier(),
+                new JsonManifestWriter());
 
-            var exitCode = await service.RunAsync(configPath);
+            var exitCode = await service.RunAsync(fixture.ConfigPath);
 
             Assert.Equal(2, exitCode);
-            var config = new JsonConfigLoader().Load(configPath);
+            var config = new JsonConfigLoader().Load(fixture.ConfigPath);
             Assert.NotNull(statusStore.GetCheckedAt(config));
+            Assert.Equal(OtaUpdatePhases.ReadyToApply, statusStore.Read(config).Phase);
         }
         finally
         {
-            File.Delete(manifestPath);
             Directory.Delete(root, recursive: true);
         }
     }
@@ -131,28 +121,14 @@ public class CheckUpdateServicePolicyTests
     [Fact]
     public async Task RunAsync_ComForce_IgnoraPoliticaEIntervalo()
     {
-        var manifestPath = Path.Combine(Path.GetTempPath(), $"ota-manifest-{Guid.NewGuid():N}.json");
         var root = Path.Combine(Path.GetTempPath(), $"ota-policy-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(root);
-        var configPath = WriteConfigWithKioskData(root, manifestPath);
-
-        File.WriteAllText(manifestPath, """
-            {
-              "app": "jukeeo",
-              "version": "9.9.9",
-              "arch": "aarch64",
-              "sha256": "abc123",
-              "signature_b64": "",
-              "signature_algorithm": "rsa-pss-sha256",
-              "released_at": "2026-06-12T12:00:00Z"
-            }
-            """);
 
         try
         {
+            var fixture = await OtaTestFixture.CreateAsync(root, remoteVersion: "9.9.9", currentVersion: "1.4.1");
             using var client = new HttpOtaUpdateClient();
             var statusStore = new InMemoryStatusStore();
-            var config = new JsonConfigLoader().Load(configPath);
+            var config = new JsonConfigLoader().Load(fixture.ConfigPath);
             statusStore.SetCheckedAt(config, DateTimeOffset.UtcNow);
 
             var now = TimeOnly.FromDateTime(DateTime.Now);
@@ -168,15 +144,17 @@ public class CheckUpdateServicePolicyTests
                 client,
                 new ConsoleTelemetryReporter(),
                 policy,
-                statusStore);
+                statusStore,
+                new RsaPssPackageVerifier(),
+                new JsonManifestWriter());
 
-            var exitCode = await service.RunAsync(configPath, force: true);
+            var exitCode = await service.RunAsync(fixture.ConfigPath, force: true);
 
             Assert.Equal(2, exitCode);
+            Assert.Equal(OtaUpdatePhases.ReadyToApply, statusStore.Read(config).Phase);
         }
         finally
         {
-            File.Delete(manifestPath);
             Directory.Delete(root, recursive: true);
         }
     }
@@ -192,7 +170,9 @@ public class CheckUpdateServicePolicyTests
             httpSpy,
             new ConsoleTelemetryReporter(),
             policy,
-            statusStore);
+            statusStore,
+            new RsaPssPackageVerifier(),
+            new JsonManifestWriter());
 
     private static string WriteMinimalConfig()
     {

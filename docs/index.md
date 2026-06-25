@@ -14,6 +14,9 @@ Ponto de entrada para agentes neste repositório.
 |------|------|
 | [[PLANO_POC_DOTNET_PI]] | POC .NET no Raspberry Pi (fases 0–5) |
 | [[PLANO_SEGURANCA_OTA_PENDENCIAS]] | Pendências de segurança — servidor, verify, chave pública no Pi |
+| [[PLANO_OTA_CHECK_DOWNLOAD_APPLY]] | `check` com download, `upgrade` só apply, grace period (ADR 0002) |
+| `docs/adr/0002-ota-check-download-e-grace-period-kiosk.md` | ADR — fase `ready_to_apply`, timer só `check` |
+| `jukebox_tv/docs/plans/PLANO_OTA_GRACE_PERIOD_POPUP.md` | Overlay grace period no kiosk ([[PLANO_OTA_GRACE_PERIOD_POPUP]]) |
 | `jukebox_tv/docs/plans/PLANO_OTA_EXECUCAO_PI.md` | Execução OTA: `/opt/jukeeo`, apply, GC, ack ([[PLANO_OTA_EXECUCAO_PI]]) |
 | `docs/API.md` | Contrato HTTP (`jukeeo`, ack completo); backup pré-update no `apply` |
 | `docs/howto/DEPLOY_PI.md` | Deploy self-contained no Pi |

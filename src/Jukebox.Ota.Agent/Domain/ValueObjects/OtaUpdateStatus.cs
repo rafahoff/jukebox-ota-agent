@@ -15,8 +15,11 @@ public static class OtaUpdatePhases
 {
     public const string Idle = "idle";
     public const string Checking = "checking";
+    /// <summary>Legado — check moderno transita para <see cref="ReadyToApply"/> após download.</summary>
     public const string UpdateAvailable = "update_available";
     public const string Downloading = "downloading";
+    /// <summary>Pacote verificado em cache; <c>upgrade</c> pode aplicar sem novo download.</summary>
+    public const string ReadyToApply = "ready_to_apply";
     public const string Applying = "applying";
     public const string Error = "error";
 }

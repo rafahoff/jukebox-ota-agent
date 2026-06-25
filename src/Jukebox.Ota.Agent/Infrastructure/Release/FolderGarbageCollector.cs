@@ -39,7 +39,20 @@ public static class FolderGarbageCollector
             }
 
             var fullPath = Path.Combine(parentDir, folder);
-            Directory.Delete(fullPath, recursive: true);
+            try
+            {
+                Directory.Delete(fullPath, recursive: true);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.Error.WriteLine(
+                    $"GC ignorou pasta sem permissão: {fullPath} ({ex.Message})");
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine(
+                    $"GC ignorou pasta inacessível: {fullPath} ({ex.Message})");
+            }
         }
     }
 }

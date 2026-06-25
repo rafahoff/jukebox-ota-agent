@@ -1,5 +1,3 @@
-using Jukebox.Ota.Agent.Domain.Entities;
-using Jukebox.Ota.Agent.Domain.Repositories;
 using Jukebox.Ota.Agent.Domain.Services;
 using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
@@ -9,30 +7,24 @@ using Jukebox.Ota.Agent.Infrastructure.Policy;
 
 namespace Jukebox.Ota.Agent.Application.Services;
 
-/// <summary>Orquestra check → download → apply num único fluxo operador.</summary>
+/// <summary>Aplica pacote OTA já descarregado pelo <see cref="CheckUpdateService"/> (apply-only).</summary>
 public sealed class UpgradeUpdateService
 {
     private readonly JsonConfigLoader _configLoader;
-    private readonly CheckUpdateService _checkService;
     private readonly ApplyUpdateService _applyService;
-    private readonly IOtaUpdateClient _otaClient;
     private readonly IOtaUpdateStatusStore _statusStore;
-    private readonly JsonManifestWriter _manifestWriter;
+    private readonly JsonManifestLoader _manifestLoader;
 
     public UpgradeUpdateService(
         JsonConfigLoader configLoader,
-        CheckUpdateService checkService,
         ApplyUpdateService applyService,
-        IOtaUpdateClient otaClient,
         IOtaUpdateStatusStore statusStore,
-        JsonManifestWriter manifestWriter)
+        JsonManifestLoader manifestLoader)
     {
         _configLoader = configLoader;
-        _checkService = checkService;
         _applyService = applyService;
-        _otaClient = otaClient;
         _statusStore = statusStore;
-        _manifestWriter = manifestWriter;
+        _manifestLoader = manifestLoader;
     }
 
     public async Task<int> RunAsync(
@@ -45,38 +37,64 @@ public sealed class UpgradeUpdateService
         try
         {
             config = _configLoader.Load(configPath);
-            var checkOutcome = await _checkService.ExecuteAsync(configPath, force, cancellationToken);
+            var status = _statusStore.Read(config);
 
-            if (checkOutcome.ExitCode == 1)
+            if (string.IsNullOrWhiteSpace(status.RemoteVersion))
             {
-                return 1;
-            }
-
-            if (!checkOutcome.UpdateAvailable || checkOutcome.Manifest is null)
-            {
-                Console.WriteLine("Nenhuma atualização disponível para aplicar.");
+                Console.WriteLine("Nenhuma atualização pronta para aplicar (remote_version ausente).");
                 return 0;
             }
 
-            var manifest = checkOutcome.Manifest;
-            var downloadDir = Path.Combine(config.StateDirectory, "downloads");
-            Directory.CreateDirectory(downloadDir);
+            var remoteVersion = status.RemoteVersion;
+            string manifestPath;
+            string packagePath;
 
-            WriteStatus(config, status => status with
+            if (!OtaDownloadCache.TryResolveReadyCache(
+                    config,
+                    remoteVersion,
+                    ResolveArchFromCache(config, remoteVersion),
+                    out manifestPath,
+                    out packagePath))
             {
-                Phase = OtaUpdatePhases.Downloading,
-                CurrentVersion = config.CurrentVersion,
-                RemoteVersion = manifest.Version,
-                UpdateAvailable = true,
-                ErrorMessage = null,
-            });
+                if (OtaDownloadCache.TryFindAnyCachedManifest(config, out var staleManifestPath))
+                {
+                    var staleManifest = _manifestLoader.Load(staleManifestPath);
+                    if (!string.Equals(staleManifest.Version, remoteVersion, StringComparison.Ordinal))
+                    {
+                        return RejectVersionMismatch(config, status, staleManifest.Version, remoteVersion);
+                    }
 
-            Console.WriteLine($"Descarregando pacote {manifest.Version}+{manifest.Arch}...");
-            FileAgentLogger.LogApply($"Descarregando pacote {manifest.Version}+{manifest.Arch}...");
-            var packagePath = await _otaClient.DownloadPackageAsync(config, manifest, downloadDir, cancellationToken);
+                    // Manifesto existe e coincide; tentar resolver pacote pela arch do manifesto.
+                    manifestPath = staleManifestPath;
+                    packagePath = OtaDownloadCache.GetPackagePath(config, staleManifest);
+                    if (!File.Exists(packagePath))
+                    {
+                        Console.WriteLine(
+                            $"Nenhuma atualização pronta para aplicar (pacote ausente para {remoteVersion}).");
+                        return 0;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine(
+                        $"Nenhuma atualização pronta para aplicar (cache ausente para {remoteVersion}).");
+                    return 0;
+                }
+            }
 
-            var manifestPath = Path.Combine(downloadDir, $"jukeeo-{manifest.Version}-manifest.json");
-            _manifestWriter.Write(manifestPath, manifest);
+            var manifest = _manifestLoader.Load(manifestPath);
+
+            // A2: recusa apply se versão em cache ≠ remote_version no status
+            if (!string.Equals(manifest.Version, remoteVersion, StringComparison.Ordinal))
+            {
+                return RejectVersionMismatch(config, status, manifest.Version, remoteVersion);
+            }
+
+            if (status.Phase != OtaUpdatePhases.ReadyToApply)
+            {
+                Console.WriteLine(
+                    $"Aplicando pacote em cache (phase={status.Phase}; esperado {OtaUpdatePhases.ReadyToApply}).");
+            }
 
             return await _applyService.RunAsync(configPath, manifestPath, packagePath, force, cancellationToken);
         }
@@ -97,6 +115,54 @@ public sealed class UpgradeUpdateService
 
             return 1;
         }
+    }
+
+    private int RejectVersionMismatch(
+        OtaAgentConfig config,
+        OtaUpdateStatus status,
+        string cacheVersion,
+        string remoteVersion)
+    {
+        var message =
+            $"Apply recusado: versão em cache ({cacheVersion}) difere de remote_version ({remoteVersion}).";
+        Console.Error.WriteLine(message);
+        FileAgentLogger.LogApply(message);
+        WriteStatus(config, s => s with
+        {
+            Phase = OtaUpdatePhases.Error,
+            CurrentVersion = config.CurrentVersion,
+            ErrorMessage = message,
+        });
+        return 1;
+    }
+
+    private static string ResolveArchFromCache(OtaAgentConfig config, string version)
+    {
+        var downloadDir = OtaDownloadCache.GetDownloadDirectory(config);
+        if (!Directory.Exists(downloadDir))
+        {
+            return "aarch64";
+        }
+
+        var prefix = $"jukeeo-{version}+";
+        foreach (var file in Directory.EnumerateFiles(downloadDir, $"{prefix}*.tar.zst"))
+        {
+            var fileName = Path.GetFileName(file);
+            if (!fileName.EndsWith(".tar.zst", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Path.GetFileNameWithoutExtension só remove .zst — tratar .tar.zst explicitamente.
+            var nameWithoutExtension = fileName[..^".tar.zst".Length];
+            var plusIndex = nameWithoutExtension.IndexOf('+', StringComparison.Ordinal);
+            if (plusIndex >= 0 && plusIndex < nameWithoutExtension.Length - 1)
+            {
+                return nameWithoutExtension[(plusIndex + 1)..];
+            }
+        }
+
+        return "aarch64";
     }
 
     private void WriteStatus(OtaAgentConfig config, Func<OtaUpdateStatus, OtaUpdateStatus> mutator)
