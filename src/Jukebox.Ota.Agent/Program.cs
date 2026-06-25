@@ -38,6 +38,7 @@ try
 {
     var telemetry = new ConsoleTelemetryReporter();
     var configLoader = new JsonConfigLoader();
+    var configWriter = new JsonConfigWriter();
     var manifestLoader = new JsonManifestLoader();
     var manifestWriter = new JsonManifestWriter();
     using var otaClient = new HttpOtaUpdateClient();
@@ -49,16 +50,18 @@ try
     var backupService = new FileSystemBackupService();
     var packageVerifier = new RsaPssPackageVerifier();
     var manifestSigner = new RsaPssManifestSigner();
+    var versionSync = new OtaConfigVersionSync(configWriter, releaseManager);
 
     var policyProvider = new SqliteOtaPolicyProvider();
     var statusStore = new FileOtaUpdateStatusStore();
 
     var versionService = new VersionService();
-    var checkService = new CheckUpdateService(configLoader, otaClient, telemetry, policyProvider, statusStore);
+    var checkService = new CheckUpdateService(configLoader, versionSync, otaClient, telemetry, policyProvider, statusStore);
     var verifyService = new VerifyPackageService(manifestLoader, packageVerifier, telemetry);
     var signManifestService = new SignManifestService(manifestLoader, manifestWriter, manifestSigner);
     var applyService = new ApplyUpdateService(
         configLoader,
+        versionSync,
         manifestLoader,
         packageVerifier,
         systemService,

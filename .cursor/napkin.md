@@ -52,6 +52,12 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 - [2026-06-19] **Backup pré-update no apply**
   Faça assim: origem `kiosk_data_dir` (`jukebox_library.db` + wal/shm + `shared_preferences.json`); destino `/opt/jukeeo/backups/pre-{versão}-{ts UTC}/`; `IBackupService` em `Infrastructure/Backup/FileSystemBackupService.cs`; rollback automático **não** restaura DB — ver `README.md` § Backup e `docs/API.md` § apply.
 
+- [2026-06-25] **Timer systemd executa `upgrade` (não só `check`)**
+  Faça assim: `jukebox_ota_agent.service` → `upgrade --config /etc/jukeeo/ota-agent.json`; respeita política SQLite; aplica update dentro da janela. `SuccessExitStatus=0` apenas.
+
+- [2026-06-25] **ProtectHome e política OTA no timer**
+  Faça assim: unit com `ProtectHome=read-only` + `ReadWritePaths` em `kiosk_data_dir`, `/opt/jukeeo/releases`, `/opt/jukeeo/backups`, `/opt/jukeeo`. Sem leitura do SQLite → intervalo default 30 min (ignora UI 5 min). `NoNewPrivileges=no` para `sudo -n systemctl` no apply.
+
 - [2026-06-19] **Estado OTA partilhado (ADR 0001)**
   Faça assim: `{kiosk_data_dir}/ota_update_status.json` (schema v1); `checked_at_ms` substitui `last_check_at_ms` em `state_directory`; migração one-shot automática; `check|upgrade|apply --force` ignora política SQLite; `upgrade` = check → download (`{state_directory}/downloads/`) → apply.
 
@@ -62,7 +68,7 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
   Faça assim: `jukebox_ota_agent.service` tipo `oneshot` + `jukebox_ota_agent.timer` (10min); reduz RAM idle no Pi.
 
 - [2026-06-18] **Exit 2 no check ≠ falha systemd**
-  Faça assim: unit com `SuccessExitStatus=0 2`; validar com `systemctl show -p ExecMainStatus,Result jukebox_ota_agent.service` após `systemctl start` quando há update disponível.
+  Faça assim: só relevante para `check` manual; o timer usa `upgrade` (exit 0 sucesso, 1 erro). Validar com `journalctl -t jukebox-ota` após `systemctl start jukebox_ota_agent.service`.
 
 ## Segurança
 

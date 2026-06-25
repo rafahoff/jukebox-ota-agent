@@ -141,7 +141,7 @@ Em `check`, `upgrade` ou `apply`, ignora:
 - janela horária (`ota_check_window_start` / `ota_check_window_end`);
 - `ota_check_enabled=false` em `machine_config`.
 
-O toggle «Verificar atualizações automaticamente» no kiosk afecta apenas o timer systemd; não impede disparo manual com `--force`.
+O toggle «Verificar atualizações automaticamente» no kiosk afecta o timer systemd (`jukebox_ota_agent.timer`), que executa **`upgrade`** (não só `check`): respeita intervalo, janela e `ota_check_enabled`; se houver pacote mais recente, aplica automaticamente. Não impede disparo manual com `--force`.
 
 ### `upgrade`
 

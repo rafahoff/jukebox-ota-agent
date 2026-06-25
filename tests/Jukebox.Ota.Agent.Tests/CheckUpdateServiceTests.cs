@@ -3,6 +3,7 @@ using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
 using Jukebox.Ota.Agent.Infrastructure.Policy;
+using Jukebox.Ota.Agent.Infrastructure.Release;
 using Jukebox.Ota.Agent.Infrastructure.Telemetry;
 
 namespace Jukebox.Ota.Agent.Tests;
@@ -46,6 +47,7 @@ public class CheckUpdateServiceTests
             using var client = new HttpOtaUpdateClient();
             var service = new CheckUpdateService(
                 new JsonConfigLoader(),
+                new OtaConfigVersionSync(new JsonConfigWriter(), new FileSystemReleaseManager()),
                 client,
                 new ConsoleTelemetryReporter(),
                 new AlwaysAllowPolicyProvider(),

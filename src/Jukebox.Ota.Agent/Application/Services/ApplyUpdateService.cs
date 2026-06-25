@@ -14,6 +14,7 @@ public sealed class ApplyUpdateService
     private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(90);
 
     private readonly JsonConfigLoader _configLoader;
+    private readonly OtaConfigVersionSync _versionSync;
     private readonly JsonManifestLoader _manifestLoader;
     private readonly IPackageVerifier _packageVerifier;
     private readonly ISystemService _systemService;
@@ -26,6 +27,7 @@ public sealed class ApplyUpdateService
 
     public ApplyUpdateService(
         JsonConfigLoader configLoader,
+        OtaConfigVersionSync versionSync,
         JsonManifestLoader manifestLoader,
         IPackageVerifier packageVerifier,
         ISystemService systemService,
@@ -37,6 +39,7 @@ public sealed class ApplyUpdateService
         IOtaUpdateStatusStore statusStore)
     {
         _configLoader = configLoader;
+        _versionSync = versionSync;
         _manifestLoader = manifestLoader;
         _packageVerifier = packageVerifier;
         _systemService = systemService;
@@ -56,6 +59,7 @@ public sealed class ApplyUpdateService
         CancellationToken cancellationToken = default)
     {
         var config = _configLoader.Load(configPath);
+        config = _versionSync.ResolveAndSync(configPath, config);
         var manifest = _manifestLoader.Load(manifestPath);
         var versionPrevious = _releaseManager.GetCurrentReleaseVersion(config) ?? config.CurrentVersion;
 
@@ -166,6 +170,17 @@ public sealed class ApplyUpdateService
             _backupService.CollectGarbage(config.BackupsDir, config.MaxReleaseFolders);
 
             await SendAckAsync(config, manifest, versionPrevious, manifest.Version, "success", null, null, cancellationToken);
+            try
+            {
+                _versionSync.PersistCurrentVersion(configPath, manifest.Version);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"AVISO: apply concluído mas current_version no config não foi gravada: {ex.Message}");
+                FileAgentLogger.LogApply($"AVISO: current_version no config não gravada: {ex.Message}");
+            }
+
+            config = config with { CurrentVersion = manifest.Version };
             WriteStatus(config, status => status with
             {
                 Phase = OtaUpdatePhases.Idle,

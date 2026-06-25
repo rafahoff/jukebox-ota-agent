@@ -17,7 +17,7 @@ Agente de atualização over-the-air (OTA) para quiosques Jukeeo — processo **
 | **API OTA** | Cliente `GET /v1/updates/check` e `POST /v1/updates/ack` |
 | **Segurança** | Verificação `sha256` + assinatura RSA-PSS do manifesto |
 | **Apply** | Stop kiosk, backup SQLite/SharedPreferences, swap em `/opt/jukeeo/current`, health check, rollback automático |
-| **Runtime Pi** | Utilizador `jukebox-ota`, units systemd + timer (`packaging/systemd/`), sudoers restrito para `systemctl` do kiosk |
+| **Runtime Pi** | Utilizador `jukebox-ota`, units systemd + timer (`upgrade` automático), sudoers restrito para `systemctl` do kiosk |
 | **Observabilidade** | Stdout → journald (`SyslogIdentifier=jukebox-ota`); log opcional em ficheiro |
 
 **Fora deste repo (backlog ou futuro):** servidor OTA produção JUK-72 (`jukebox-ota-server`), pipeline fleet off-device ([JUK-71](https://linear.app/jukeeo/issue/JUK-71)), TLS agente↔servidor ([JUK-73](https://linear.app/jukeeo/issue/JUK-73)), auto-update do próprio binário do agente.

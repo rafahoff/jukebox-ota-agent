@@ -12,6 +12,7 @@ namespace Jukebox.Ota.Agent.Application.Services;
 public sealed class CheckUpdateService
 {
     private readonly JsonConfigLoader _configLoader;
+    private readonly OtaConfigVersionSync _versionSync;
     private readonly IOtaUpdateClient _otaClient;
     private readonly ITelemetryReporter _telemetry;
     private readonly IOtaPolicyProvider _policyProvider;
@@ -19,12 +20,14 @@ public sealed class CheckUpdateService
 
     public CheckUpdateService(
         JsonConfigLoader configLoader,
+        OtaConfigVersionSync versionSync,
         IOtaUpdateClient otaClient,
         ITelemetryReporter telemetry,
         IOtaPolicyProvider policyProvider,
         IOtaUpdateStatusStore statusStore)
     {
         _configLoader = configLoader;
+        _versionSync = versionSync;
         _otaClient = otaClient;
         _telemetry = telemetry;
         _policyProvider = policyProvider;
@@ -50,6 +53,7 @@ public sealed class CheckUpdateService
         try
         {
             config = _configLoader.Load(configPath);
+            config = _versionSync.ResolveAndSync(configPath, config);
             WriteStatus(config, status => status with
             {
                 Phase = OtaUpdatePhases.Checking,

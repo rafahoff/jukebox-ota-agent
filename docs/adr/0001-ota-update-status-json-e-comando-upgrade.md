@@ -65,7 +65,7 @@ O agente actualiza o JSON em cada transição relevante (`check`, download, `app
 - janela horária (`ota_check_window_start` / `ota_check_window_end`);
 - `ota_check_enabled=false` em `machine_config`.
 
-O toggle **«Verificar atualizações automaticamente»** no kiosk continua a afectar **apenas** o timer systemd (`jukebox-ota-check.timer`); não impede disparo manual com `--force` nem leitura do JSON.
+O toggle **«Verificar atualizações automaticamente»** no kiosk afecta o timer systemd (`jukebox_ota_agent.timer`), que executa **`upgrade`** (check com política → apply se houver update). Não impede disparo manual com `--force` nem leitura do JSON.
 
 ### 5. Disparo a partir do kiosk
 

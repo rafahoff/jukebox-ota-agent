@@ -102,13 +102,17 @@ apply_install_permissions() {
 
   if [[ -f "$CONFIG_PATH" ]]; then
     chown "root:${OTA_GROUP}" "$CONFIG_PATH"
-    chmod 640 "$CONFIG_PATH"
+    chmod 660 "$CONFIG_PATH"
   fi
 
   shopt -s nullglob
   for f in /etc/jukeeo/*.json /etc/jukeeo/*.pem; do
     chown "root:${OTA_GROUP}" "$f"
-    chmod 640 "$f"
+    if [[ "$f" == "$CONFIG_PATH" ]]; then
+      chmod 660 "$f"
+    else
+      chmod 640 "$f"
+    fi
   done
   shopt -u nullglob
 }
@@ -205,9 +209,38 @@ apply_kiosk_logs_write_acl() {
   setfacl -m "u:${KIOSK_USER}:r" "$logs_dir"
   setfacl -d -m "u:${KIOSK_USER}:r" "$logs_dir" 2>/dev/null || true
   if [[ -f "${logs_dir}/jukebox_ota_agent.log" ]]; then
+    # sign-manifest no builder pode criar o ficheiro como root — repõe dono para ACL do agente.
+    chown "${KIOSK_USER}:${KIOSK_USER}" "${logs_dir}/jukebox_ota_agent.log" 2>/dev/null || true
+    setfacl -m "u:${OTA_USER}:rw" "${logs_dir}/jukebox_ota_agent.log" 2>/dev/null || true
     setfacl -m "u:${KIOSK_USER}:r" "${logs_dir}/jukebox_ota_agent.log" 2>/dev/null || true
     chmod a+r "${logs_dir}/jukebox_ota_agent.log" 2>/dev/null || true
   fi
+}
+
+apply_kiosk_ota_status_write_acl() {
+  local kiosk_share="/home/${KIOSK_USER}/.local/share/com.jukeeo.kiosk"
+  local status_file="${kiosk_share}/ota_update_status.json"
+
+  ensure_acl_package
+
+  if [[ ! -d "$kiosk_share" ]]; then
+    log "AVISO: diretório kiosk ausente (${kiosk_share}) — ACL de ota_update_status.json omitida"
+    return 0
+  fi
+
+  if ! command -v setfacl >/dev/null 2>&1; then
+    log "AVISO: setfacl ainda indisponível — escrita de ota_update_status.json pode falhar"
+    return 0
+  fi
+
+  log "ACL de escrita para ${OTA_USER} em ${status_file} (estado OTA partilhado com kiosk)..."
+  # wx no diretório: ficheiros temporários atómicos (*.tmp) durante Write.
+  setfacl -m "u:${OTA_USER}:wx" "$kiosk_share"
+  touch "$status_file"
+  chown "${KIOSK_USER}:${KIOSK_USER}" "$status_file"
+  chmod 664 "$status_file"
+  setfacl -m "u:${OTA_USER}:rw" "$status_file"
+  setfacl -m "u:${KIOSK_USER}:rw" "$status_file"
 }
 
 normalize_ota_config() {
@@ -338,6 +371,7 @@ apply_install_permissions
 apply_jukeeo_ota_layout_permissions
 apply_kiosk_data_read_acl
 apply_kiosk_logs_write_acl
+apply_kiosk_ota_status_write_acl
 install_sudoers
 
 if [[ -d "$SYSTEMD_DIR" ]]; then

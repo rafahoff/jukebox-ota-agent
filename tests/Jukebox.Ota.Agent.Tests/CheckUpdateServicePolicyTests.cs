@@ -5,6 +5,7 @@ using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
 using Jukebox.Ota.Agent.Infrastructure.Policy;
+using Jukebox.Ota.Agent.Infrastructure.Release;
 using Jukebox.Ota.Agent.Infrastructure.Telemetry;
 
 namespace Jukebox.Ota.Agent.Tests;
@@ -108,6 +109,7 @@ public class CheckUpdateServicePolicyTests
             var statusStore = new FileOtaUpdateStatusStore();
             var service = new CheckUpdateService(
                 new JsonConfigLoader(),
+                new OtaConfigVersionSync(new JsonConfigWriter(), new FileSystemReleaseManager()),
                 client,
                 new ConsoleTelemetryReporter(),
                 new FakePolicyProvider(OtaCheckPolicy.Default with { IntervalMinutes = 15 }),
@@ -162,6 +164,7 @@ public class CheckUpdateServicePolicyTests
 
             var service = new CheckUpdateService(
                 new JsonConfigLoader(),
+                new OtaConfigVersionSync(new JsonConfigWriter(), new FileSystemReleaseManager()),
                 client,
                 new ConsoleTelemetryReporter(),
                 policy,
@@ -185,6 +188,7 @@ public class CheckUpdateServicePolicyTests
         HttpSpyOtaClient httpSpy) =>
         new(
             new JsonConfigLoader(),
+            new OtaConfigVersionSync(new JsonConfigWriter(), new FileSystemReleaseManager()),
             httpSpy,
             new ConsoleTelemetryReporter(),
             policy,

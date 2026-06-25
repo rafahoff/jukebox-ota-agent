@@ -209,6 +209,7 @@ public class ApplyUpdateServiceTests
 
         return new ApplyUpdateService(
             new JsonConfigLoader(),
+            new OtaConfigVersionSync(new JsonConfigWriter(), releaseManager),
             new JsonManifestLoader(),
             new FakePackageVerifier(),
             new FakeSystemService(),

@@ -140,6 +140,8 @@ Set-UnixLineEndings @(
     $InstallScript
     (Join-Path $StagingDir "pi_install_ota.sh")
     (Join-Path $stagingSudoers "jukebox-ota-systemctl.template")
+    (Join-Path $stagingSystemd "jukebox_ota_agent.service")
+    (Join-Path $stagingSystemd "jukebox_ota_agent.timer")
 )
 
 # --- Enviar para o Pi ---

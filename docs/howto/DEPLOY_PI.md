@@ -39,7 +39,7 @@ Critério de saída F2: binário executa `version` no Pi.
 
 Units em `packaging/systemd/`:
 
-- `jukebox_ota_agent.service` — oneshot `check` como utilizador **`jukebox-ota`** (não root)
+- `jukebox_ota_agent.service` — oneshot **`upgrade`** como utilizador **`jukebox-ota`** (check com política SQLite → download + apply se houver update)
 - `jukebox_ota_agent.timer` — `OnBootSec=5min`, `OnUnitActiveSec=10min` (tick barato; intervalo/janela na política SQLite)
 
 O `pi_install_ota.sh` cria o utilizador de sistema `jukebox-ota` e aplica permissões:
@@ -47,6 +47,7 @@ O `pi_install_ota.sh` cria o utilizador de sistema `jukebox-ota` e aplica permis
 | Caminho | Dono | Modo | Notas |
 |---------|------|------|-------|
 | `/opt/jukeeo/ota-agent/` | `root:jukebox-ota` | dirs `750`, ficheiros `640`, binário `750` | Agente lê/executa; não grava |
+| `/home/jukebox/.local/share/com.jukeeo.kiosk/ota_update_status.json` | `jukebox` + ACL | `664` + ACL | Estado OTA para UI (`pi_install` aplica ACL `jukebox-ota:rw`) |
 | `/etc/jukeeo/` | `root:jukebox-ota` | `750` | Config e PEM legíveis pelo grupo |
 | `/etc/jukeeo/ota-agent.json` | `root:jukebox-ota` | `640` | |
 | `/opt/jukeeo/releases`, `backups`, `ota/*` | `root:jukebox-ota` | `2775` (setgid) | Apply grava releases/backups; builder em `ota/out` |
@@ -137,7 +138,9 @@ Validar após install:
 sudo -u jukebox-ota sudo -n /bin/systemctl is-active jukeeo_kiosk_flutterpi.service
 ```
 
-**Nota:** a unit `jukebox_ota_agent.service` mantém `NoNewPrivileges=yes` (só `check`). O `apply` deve correr via CLI como `jukebox-ota` (não através da unit de check).
+**Sandbox systemd:** `ProtectHome=read-only` + `ReadWritePaths` em `kiosk_data_dir`, `/opt/jukeeo/{releases,backups}` e `/opt/jukeeo` (symlinks `current`/`previous`). Sem isto o timer ignora intervalo/janela da UI (defaults 30 min). `NoNewPrivileges=no` — necessário para `sudo -n systemctl` no apply.
+
+**Nota:** disparo manual continua disponível (`check`, `upgrade --force` na CLI).
 
 ## Configuração
 

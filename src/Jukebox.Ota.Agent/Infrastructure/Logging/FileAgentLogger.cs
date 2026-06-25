@@ -76,6 +76,8 @@ public static class FileAgentLogger
         return logsDir is null ? null : Path.Combine(logsDir, $"{LogBaseName}.log");
     }
 
+    private static int _writeFailureLogged;
+
     private static void WriteLine(string content)
     {
         var logsDir = ResolveLogsDirectory();
@@ -101,9 +103,14 @@ public static class FileAgentLogger
                 File.AppendAllText(logPath, line, Encoding.UTF8);
                 TryMakeLogReadableByKiosk(logPath);
             }
-            catch
+            catch (Exception ex)
             {
-                // Skip silencioso — journald/console permanecem como fallback.
+                // Journald/console permanecem como fallback; avisa uma vez por processo.
+                if (Interlocked.CompareExchange(ref _writeFailureLogged, 1, 0) == 0)
+                {
+                    Console.Error.WriteLine(
+                        $"FileAgentLogger: falha ao gravar log OTA ({ex.Message}). Ver permissões em {logsDir}.");
+                }
             }
         }
     }
