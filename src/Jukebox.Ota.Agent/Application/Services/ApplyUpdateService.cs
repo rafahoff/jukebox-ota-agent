@@ -159,9 +159,20 @@ public sealed class ApplyUpdateService
             {
                 Console.Error.WriteLine($"Health falhou: {health.Message}");
                 FileAgentLogger.LogApply($"Health falhou: {health.Message}");
-                WriteApplyError(config, health.Message ?? "Health check falhou.");
                 await RollbackAsync(config, cancellationToken);
                 var rolledBackVersion = _releaseManager.GetCurrentReleaseVersion(config) ?? versionPrevious;
+                var rollbackMessage = OtaRollbackMessages.Format(
+                    manifest.Version,
+                    rolledBackVersion,
+                    health.Message);
+                WriteStatus(config, status => status with
+                {
+                    Phase = OtaUpdatePhases.Error,
+                    CurrentVersion = rolledBackVersion,
+                    RemoteVersion = manifest.Version,
+                    UpdateAvailable = true,
+                    ErrorMessage = rollbackMessage,
+                });
                 await SendAckAsync(config, manifest, versionPrevious, rolledBackVersion, "rolled_back", health.ErrorCode, health.Message, cancellationToken);
                 return 1;
             }
@@ -204,6 +215,18 @@ public sealed class ApplyUpdateService
                 {
                     await RollbackAsync(config, cancellationToken);
                     var rolledBackVersion = _releaseManager.GetCurrentReleaseVersion(config) ?? versionPrevious;
+                    var rollbackMessage = OtaRollbackMessages.Format(
+                        manifest.Version,
+                        rolledBackVersion,
+                        ex.Message);
+                    WriteStatus(config, status => status with
+                    {
+                        Phase = OtaUpdatePhases.Error,
+                        CurrentVersion = rolledBackVersion,
+                        RemoteVersion = manifest.Version,
+                        UpdateAvailable = true,
+                        ErrorMessage = rollbackMessage,
+                    });
                     await SendAckAsync(config, manifest, versionPrevious, rolledBackVersion, "rolled_back", "service_inactive", ex.Message, cancellationToken);
                 }
                 catch (Exception rollbackEx)

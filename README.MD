@@ -26,6 +26,73 @@ Agente de atualização over-the-air (OTA) para quiosques Jukeeo — processo **
 
 **Repo irmão:** app Flutter [`jukebox_tv`](https://github.com/rafahoff/jukebox_tv).
 
+## Testar o servidor OTA manualmente
+
+O servidor paliativo [`jukebox-ota-server-dev`](https://github.com/rafahoff/jukebox-ota-server-dev) escuta na porta **9080** (Docker local ou LAN). Use estes passos para confirmar que o processo está no ar **antes** de rodar `check` no agente ou no Pi.
+
+### Liveness (`GET /health`)
+
+Endpoint dedicado ao **ping** — não faz parte do contrato de update, só confirma que o HTTP responde.
+
+| Aspecto | Valor |
+|---------|-------|
+| **Rota** | `GET /health` |
+| **Resposta** | `200` com corpo `{"status":"ok"}` |
+
+```powershell
+# Servidor no mesmo host (Docker local)
+curl -i "http://127.0.0.1:9080/health"
+
+# Servidor na LAN (substituir pelo IP do PC/VPS visível ao Pi)
+curl -i "http://192.168.15.129:9080/health"
+```
+
+Saída esperada (resumo): `HTTP/1.0 200 OK` e `{"status":"ok"}`.
+
+### Consulta de update (`GET /v1/updates/check`)
+
+Valida o **contrato real** consumido pelo agente (mesma rota que `ota_base_url` + `/v1/updates/check`).
+
+**Query:** `device_id`, `channel`, `version` (versão actual do dispositivo), `arch` (opcional; default `aarch64` no server dev).
+
+| Código | Significado |
+|--------|-------------|
+| `204` | Sem actualização (`version` ≥ versão publicada no canal) |
+| `200` | JSON do manifesto — update disponível |
+| `4xx` | Canal/arch inválido ou índice sem release |
+
+```powershell
+curl -i "http://127.0.0.1:9080/v1/updates/check?device_id=pi-001&channel=beta&version=0.0.0&arch=aarch64"
+```
+
+Com release publicada em `beta` e `version` inferior à do índice, a resposta traz o manifesto JSON (ver [`docs/API.md`](docs/API.md)).
+
+### Via CLI do agente
+
+Com `ota_base_url` apontando para o servidor (ex.: `http://192.168.15.129:9080` no JSON do Pi ou num config local). Exemplo LAN: `tools/mock/ota-agent.pi-100.json`.
+
+```powershell
+dotnet run --project src/Jukebox.Ota.Agent -- check --config tools/mock/ota-agent.pi-100.json
+```
+
+| Exit code | Significado |
+|-----------|-------------|
+| `0` | Sem update |
+| `2` | Update disponível |
+| `1` | Erro (servidor inacessível, TLS, resposta inválida, etc.) |
+
+No Pi: `sudo -u jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json`.
+
+### Subir o server dev e simulação LAN
+
+```bash
+# jukebox-ota-server-dev
+cp .env.example .env   # OTA_PUBLIC_BASE_URL=http://<IP-LAN>:9080 se o Pi aceder pela rede
+cd tools/deploy && docker compose up --build
+```
+
+How-tos: [`jukebox-ota-server-dev/docs/howto/simulacao-lan.md`](https://github.com/rafahoff/jukebox-ota-server-dev/blob/main/docs/howto/simulacao-lan.md) · [`docs/howto/FASE4_MOCK_LAN.md`](docs/howto/FASE4_MOCK_LAN.md) (VPS).
+
 ## CLI
 
 ```text
