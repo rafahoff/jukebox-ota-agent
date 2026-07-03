@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sincroniza staging do agente OTA para o Raspberry Pi via rsync (executado no WSL).
-# Chamado por deploy_to_pi.ps1 — não usar diretamente salvo depuração.
+# Chamado por ota_deploy_to_pi.ps1 — não usar diretamente salvo depuração.
 #
 # Uso: deploy_to_pi_rsync.sh <host> <user> <staging_local> <remote_staging>
 

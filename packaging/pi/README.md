@@ -18,7 +18,7 @@ Pi alvo de referência: `jukebox@192.168.15.100` (mesmo utilizador padrão do `j
 | Fase | Onde | O quê |
 |------|------|-------|
 | Publish | Windows | `publish-linux-arm64.ps1` → `artifacts/linux-arm64/` |
-| Deploy | Windows | `deploy_to_pi.ps1` — rsync/scp staging + SSH install |
+| Deploy | Windows | `ota_deploy_to_pi.ps1` — rsync/scp staging + SSH install |
 | Instalação | Pi (via SSH) | `pi_install_ota.sh` — binário, systemd, config |
 | Validação | Windows | `verify_pi_from_windows.ps1` — checklist pass/fail |
 
@@ -49,10 +49,10 @@ Copiar e marcar após cada passo:
 .\tools\deploy\publish-linux-arm64.ps1
 
 # 2. Deploy + instalação (timer desligado por padrão)
-.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100
+.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100
 
 # 3. Com timer periódico habilitado
-.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
+.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
 
 # 4. Validação orquestrada
 .\tools\deploy\verify_pi_from_windows.ps1 -PiHost 192.168.15.100
@@ -73,7 +73,7 @@ sudo journalctl -t jukebox-ota -n 50 --no-pager
 
 ## Dependência WSL / rsync
 
-O `deploy_to_pi.ps1` **prefere** WSL + `rsync` (incremental, mesmo padrão do `jukebox_tv` em `tools/flutterpi/`).
+O `ota_deploy_to_pi.ps1` **prefere** WSL + `rsync` (incremental, mesmo padrão do `jukebox_tv` em `tools/flutterpi/`).
 
 Se WSL não estiver disponível ou rsync falhar, usa **fallback `scp`** nativo do Windows OpenSSH.
 

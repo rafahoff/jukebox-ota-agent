@@ -19,7 +19,7 @@ Scripts de **deploy** não ficam na raiz do repositório.
 [Windows]  publish-linux-arm64.ps1  →  artifacts/linux-arm64/
      │
      ▼
-[Windows]  deploy_to_pi.ps1  →  rsync/scp  →  /tmp/jukebox-ota-staging/ (Pi)
+[Windows]  ota_deploy_to_pi.ps1  →  rsync/scp  →  /tmp/jukebox-ota-staging/ (Pi)
      │
      ▼
 [Pi]       pi_install_ota.sh  →  /opt/jukeeo/ota-agent/ + systemd + sudoers + config
@@ -36,12 +36,12 @@ Pi de referência: `jukebox@192.168.15.100`. How-to completo: [`docs/howto/DEPLO
 |--------|-----------|
 | `deploy/publish-linux-arm64.ps1` | Publish self-contained `linux-arm64` → `artifacts/linux-arm64/` |
 | `deploy/publish-linux-arm64.sh` | Equivalente bash (WSL/Linux) |
-| `deploy/deploy_to_pi.ps1` | Deploy Windows → Pi (staging + install via SSH) |
-| `deploy/deploy_to_pi_rsync.sh` | Rsync WSL (auxiliar interno do `deploy_to_pi`) |
+| `deploy/ota_deploy_to_pi.ps1` | Deploy Windows → Pi (staging + install via SSH) |
+| `deploy/deploy_to_pi_rsync.sh` | Rsync WSL (auxiliar interno do `ota_deploy_to_pi`) |
 | `deploy/pi_install_ota.sh` | Instalação no Pi: binário, systemd, sudoers, permissões `/opt/jukeeo` |
 | `deploy/verify_pi_from_windows.ps1` | Validação orquestrada via SSH (checklist pass/fail) |
 
-### `deploy_to_pi.ps1`
+### `ota_deploy_to_pi.ps1`
 
 Orquestra o deploy completo **Windows → Raspberry Pi**: publish (opcional), montagem de staging, transferência SSH e instalação remota via `pi_install_ota.sh`.
 
@@ -88,24 +88,24 @@ Executar na **raiz do repositório** (ou a partir de qualquer pasta — o script
 
 ```powershell
 # Deploy completo (rebuild + install; timer desligado)
-.\tools\deploy\deploy_to_pi.ps1
+.\tools\deploy\ota_deploy_to_pi.ps1
 
 # Pi específico + habilitar timer periódico
-.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
+.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
 
 # Só reenviar artefato já publicado (sem dotnet publish)
-.\tools\deploy\deploy_to_pi.ps1 -SkipPublish
+.\tools\deploy\ota_deploy_to_pi.ps1 -SkipPublish
 
 # Só enviar staging — install manual no Pi
-.\tools\deploy\deploy_to_pi.ps1 -SkipInstall
+.\tools\deploy\ota_deploy_to_pi.ps1 -SkipInstall
 # No Pi depois:
 #   sudo bash /tmp/jukebox-ota-staging/pi_install_ota.sh --enable-timer
 
 # Reinstalar e sobrescrever config existente
-.\tools\deploy\deploy_to_pi.ps1 -ForceConfig
+.\tools\deploy\ota_deploy_to_pi.ps1 -ForceConfig
 
 # Destino customizado (lab)
-.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.50 -RemotePath /opt/jukeeo/ota-agent -RemoteStaging /tmp/jukebox-ota-staging
+.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.50 -RemotePath /opt/jukeeo/ota-agent -RemoteStaging /tmp/jukebox-ota-staging
 ```
 
 **Códigos de saída**

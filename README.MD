@@ -142,9 +142,9 @@ dotnet run --project src/Jukebox.Ota.Agent -- check --config tools/mock/ota-agen
 
 Pi de referência: `jukebox@192.168.15.100`.
 
-O fluxo recomendado usa **`deploy_to_pi.ps1`**, que orquestra publish, envio e instalação num único comando. Alternativa manual: `publish-linux-arm64.ps1` → `deploy_to_pi.ps1 -SkipPublish` ou install no Pi.
+O fluxo recomendado usa **`ota_deploy_to_pi.ps1`**, que orquestra publish, envio e instalação num único comando. Alternativa manual: `publish-linux-arm64.ps1` → `ota_deploy_to_pi.ps1 -SkipPublish` ou install no Pi.
 
-### `deploy_to_pi.ps1`
+### `ota_deploy_to_pi.ps1`
 
 Script principal de deploy **Windows → Pi** (PowerShell, raiz do repo).
 
@@ -165,16 +165,16 @@ Script principal de deploy **Windows → Pi** (PowerShell, raiz do repo).
 
 ```powershell
 # Deploy completo (rebuild + install)
-.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100
+.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100
 
 # Com timer periódico (após validar em lab)
-.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
+.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
 
 # Só reenviar artefato já publicado
-.\tools\deploy\deploy_to_pi.ps1 -SkipPublish
+.\tools\deploy\ota_deploy_to_pi.ps1 -SkipPublish
 
 # Só enviar staging (install manual no Pi)
-.\tools\deploy\deploy_to_pi.ps1 -SkipInstall
+.\tools\deploy\ota_deploy_to_pi.ps1 -SkipInstall
 ```
 
 **Validação pós-deploy:**
@@ -185,7 +185,7 @@ Script principal de deploy **Windows → Pi** (PowerShell, raiz do repo).
 
 Saída do publish: `artifacts/linux-arm64/`. No Pi: binário em `/opt/jukeeo/ota-agent/`, config em `/etc/jukeeo/ota-agent.json`.
 
-Documentação detalhada do script: [`tools/README.md`](tools/README.md#deploy_to_pips1) · how-to completo: [`docs/howto/DEPLOY_PI.md`](docs/howto/DEPLOY_PI.md).
+Documentação detalhada do script: [`tools/README.md`](tools/README.md#ota_deploy_to_pips1) · how-to completo: [`docs/howto/DEPLOY_PI.md`](docs/howto/DEPLOY_PI.md).
 
 | Guia | Conteúdo |
 |------|----------|

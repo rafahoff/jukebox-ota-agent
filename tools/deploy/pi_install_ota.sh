@@ -298,7 +298,7 @@ install_sudoers_fragment() {
   local dest="$2"
   local label="$3"
 
-  [[ -f "$template" ]] || die "template sudoers ausente em ${template} — execute deploy_to_pi.ps1"
+  [[ -f "$template" ]] || die "template sudoers ausente em ${template} — execute ota_deploy_to_pi.ps1"
 
   log "Instalando sudoers (${label})..."
 
@@ -386,7 +386,7 @@ SYSTEMD_DIR="${STAGING_DIR}/systemd"
 CONFIG_TEMPLATE="${STAGING_DIR}/config/${CONFIG_TEMPLATE_NAME}"
 BINARY_NAME="jukebox-ota-agent"
 
-[[ -d "$ARTIFACTS_DIR" ]] || die "artifacts ausentes em ${ARTIFACTS_DIR} — execute deploy_to_pi.ps1 primeiro"
+[[ -d "$ARTIFACTS_DIR" ]] || die "artifacts ausentes em ${ARTIFACTS_DIR} — execute ota_deploy_to_pi.ps1 primeiro"
 [[ -f "${ARTIFACTS_DIR}/${BINARY_NAME}" ]] || die "binário ${BINARY_NAME} não encontrado em ${ARTIFACTS_DIR}"
 
 ensure_ota_user

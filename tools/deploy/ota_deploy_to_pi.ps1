@@ -2,10 +2,10 @@
 # Pré-requisito: SSH sem senha para ${PiUser}@${PiHost} (chave no WSL se usar rsync).
 #
 # Uso:
-#   .\tools\deploy\deploy_to_pi.ps1
-#   .\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
-#   .\tools\deploy\deploy_to_pi.ps1 -SkipInstall          # só envia staging
-#   .\tools\deploy\deploy_to_pi.ps1 -SkipPublish          # usa artifacts existentes (sem rebuild)
+#   .\tools\deploy\ota_deploy_to_pi.ps1
+#   .\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
+#   .\tools\deploy\ota_deploy_to_pi.ps1 -SkipInstall          # só envia staging
+#   .\tools\deploy\ota_deploy_to_pi.ps1 -SkipPublish          # usa artifacts existentes (sem rebuild)
 
 param(
     [string]$PiHost = "192.168.15.100",

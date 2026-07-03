@@ -6,7 +6,7 @@ Atalho local. Glossário de produto canônico: `../jukeeo-knowledge/CONTEXT.md`.
 
 Processo **separado** do app Flutter (`jukebox_tv`) e do sync agent. Responsável por check de versão, verificação de pacote, apply em `/opt/jukeeo/releases/`, health check, rollback e `ack` ao servidor.
 
-Auto-update do próprio agente: **fora de escopo v1** (provisionamento manual via `deploy_to_pi.ps1`).
+Auto-update do próprio agente: **fora de escopo v1** (provisionamento manual via `ota_deploy_to_pi.ps1`).
 
 ## device_id
 

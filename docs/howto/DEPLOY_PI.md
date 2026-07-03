@@ -10,7 +10,7 @@ Guia operacional para Fases 2–3 da POC: publish self-contained, deploy Windows
 [Windows]  publish-linux-arm64.ps1  →  artifacts/linux-arm64/
      │
      ▼
-[Windows]  deploy_to_pi.ps1  →  rsync/scp  →  /tmp/jukebox-ota-staging/ (Pi)
+[Windows]  ota_deploy_to_pi.ps1  →  rsync/scp  →  /tmp/jukebox-ota-staging/ (Pi)
      │
      ▼
 [Pi]       pi_install_ota.sh  →  /opt/jukeeo/ota-agent/ + systemd + sudoers + config
@@ -65,13 +65,13 @@ sudo systemctl start jukebox_ota_agent.service
 
 O utilizador SSH `jukebox` **não** executa o binário directamente após o install — usar `sudo -u jukebox-ota` ou o timer systemd.
 
-O timer **não** é habilitado automaticamente; use `--enable-timer` no install ou `deploy_to_pi.ps1 -EnableTimer`.
+O timer **não** é habilitado automaticamente; use `--enable-timer` no install ou `ota_deploy_to_pi.ps1 -EnableTimer`.
 
 Identificador journald: `jukebox-ota` (`SyslogIdentifier` na unit).
 
 ## Deploy orquestrado (Windows)
 
-### `deploy_to_pi.ps1`
+### `ota_deploy_to_pi.ps1`
 
 | Parâmetro | Padrão | Descrição |
 |-----------|--------|-----------|
@@ -94,7 +94,7 @@ Fluxo interno:
 Exemplo completo para `192.168.15.100`:
 
 ```powershell
-.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
+.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer
 ```
 
 ## Instalação no Pi

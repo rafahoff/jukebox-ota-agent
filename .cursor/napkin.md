@@ -79,7 +79,7 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 ## Segurança
 
 - [2026-06-18] **CRLF em scripts .sh**
-  Faça assim: `.gitattributes` força LF; `deploy_to_pi.ps1` normaliza staging; no Pi, `sed -i 's/\r$//'` se script falhar com `$'\r': command not found`.
+  Faça assim: `.gitattributes` força LF; `ota_deploy_to_pi.ps1` normaliza staging; no Pi, `sed -i 's/\r$//'` se script falhar com `$'\r': command not found`.
 
 - [2026-06-18] **Apply sem root integral**
   Faça assim: `pi_install_ota.sh` instala sudoers + permissões em `/opt/jukeeo`; `apply` como `sudo -u jukebox-ota …` (não `sudo` no binário inteiro); validar `sudo -u jukebox-ota sudo -n /bin/systemctl is-active jukeeo_kiosk_flutterpi.service`.
@@ -91,7 +91,7 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
   Faça assim: `pi_install_ota.sh --enable-timer` habilita `jukebox_ota_agent.timer` (não `.time`).
 
 - [2026-06-18] **Timer habilitado no Pi (JUK-69)**
-  Faça assim: após JUK-67/JUK-68, `.\tools\deploy\deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer` (executar na raiz do repo — `powershell -File` aninhado pode falhar parse). Validar: `systemctl is-enabled jukebox_ota_agent.timer` → `enabled`; `systemctl list-timers jukebox_ota_agent.timer`; `systemctl start jukebox_ota_agent.service` → `Result=success` com `ExecMainStatus=2` (update disponível, não failed).
+  Faça assim: após JUK-67/JUK-68, `.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.100 -EnableTimer` (executar na raiz do repo — `powershell -File` aninhado pode falhar parse). Validar: `systemctl is-enabled jukebox_ota_agent.timer` → `enabled`; `systemctl list-timers jukebox_ota_agent.timer`; `systemctl start jukebox_ota_agent.service` → `Result=success` com `ExecMainStatus=2` (update disponível, não failed).
 
 - [2026-06-18] **sudoers + nome da unit**
   Faça assim: `kiosk_service_name` e comandos `systemctl` devem usar sufixo `.service` — o fragmento sudoers lista paths literais; o agente normaliza automaticamente desde 2026-06-18.
