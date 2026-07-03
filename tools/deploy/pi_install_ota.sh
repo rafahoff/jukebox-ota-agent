@@ -167,10 +167,29 @@ ensure_acl_package() {
   fi
 }
 
+# Pi greenfield: kiosk ainda não correu — criar com.jukeeo.kiosk antes do 1.º apply/check.
+ensure_kiosk_data_dir() {
+  local kiosk_share="/home/${KIOSK_USER}/.local/share/com.jukeeo.kiosk"
+  local logs_dir="${kiosk_share}/logs"
+  local parent="/home/${KIOSK_USER}/.local/share"
+  local local_dir="/home/${KIOSK_USER}/.local"
+
+  mkdir -p "$logs_dir"
+  chown "${KIOSK_USER}:${KIOSK_USER}" "$local_dir" "$parent" "$kiosk_share"
+  chown -R "${KIOSK_USER}:${KIOSK_USER}" "$kiosk_share"
+  chmod 755 "/home/${KIOSK_USER}" 2>/dev/null || true
+  chmod 755 "$local_dir" 2>/dev/null || true
+  chmod 755 "$parent" 2>/dev/null || true
+  chmod 755 "$kiosk_share"
+  chmod 755 "$logs_dir"
+}
+
 apply_kiosk_data_read_acl() {
   local data_dir="/home/${KIOSK_USER}/.local/share/com.jukeeo.kiosk"
 
   ensure_acl_package
+
+  ensure_kiosk_data_dir
 
   if [[ ! -d "$data_dir" ]]; then
     log "AVISO: dados do kiosk ausentes (${data_dir}) — ACL de leitura omitida"

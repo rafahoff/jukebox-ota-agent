@@ -142,6 +142,39 @@ public sealed class ApplyUpdateService
             FileAgentLogger.LogApply("Trocando symlink current...");
             await _releaseManager.SwapCurrentToReleaseAsync(config, manifest.Version, manifest.Arch, cancellationToken);
 
+            var kioskUnitInstalled = await _systemService.IsServiceUnitInstalledAsync(config.KioskServiceName, cancellationToken);
+            if (!kioskUnitInstalled)
+            {
+                Console.WriteLine(
+                    $"AVISO: {config.KioskServiceName} ainda não instalada — apply de bootstrap concluído (configure autostart e inicie o kiosk).");
+                FileAgentLogger.LogApply(
+                    $"bootstrap: unit {config.KioskServiceName} ausente — skip start/health");
+                CollectGarbageSafely(config);
+                await SendAckAsync(config, manifest, versionPrevious, manifest.Version, "success", null, null, cancellationToken);
+                try
+                {
+                    _versionSync.PersistCurrentVersion(configPath, manifest.Version);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"AVISO: apply concluído mas current_version no config não foi gravada: {ex.Message}");
+                    FileAgentLogger.LogApply($"AVISO: current_version no config não gravada: {ex.Message}");
+                }
+
+                config = config with { CurrentVersion = manifest.Version };
+                WriteStatus(config, status => status with
+                {
+                    Phase = OtaUpdatePhases.Idle,
+                    CurrentVersion = manifest.Version,
+                    RemoteVersion = null,
+                    UpdateAvailable = false,
+                    ErrorMessage = null,
+                });
+                Console.WriteLine($"Apply concluído (bootstrap): {manifest.Version}");
+                FileAgentLogger.LogApply($"concluído (bootstrap): {manifest.Version}");
+                return 0;
+            }
+
             Console.WriteLine($"Iniciando {config.KioskServiceName}...");
             FileAgentLogger.LogApply($"Iniciando {config.KioskServiceName}...");
             await _systemService.StartServiceAsync(config.KioskServiceName, cancellationToken);

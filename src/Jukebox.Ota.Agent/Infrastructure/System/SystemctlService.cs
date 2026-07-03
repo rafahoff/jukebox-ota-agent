@@ -9,7 +9,21 @@ public sealed class SystemctlService : ISystemService
 {
     public async Task StopServiceAsync(string serviceName, CancellationToken cancellationToken = default)
     {
-        await RunSystemctlAsync($"stop {serviceName}", cancellationToken);
+        var exitCode = await RunSystemctlAsync($"stop {serviceName}", cancellationToken, throwOnError: false);
+        // Greenfield: unit ainda não instalada (autostart pendente).
+        if (exitCode is 0 or 5)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"systemctl stop {serviceName} falhou (exit {exitCode})");
+    }
+
+    public async Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default)
+    {
+        var exitCode = await RunSystemctlAsync($"cat {serviceName}", cancellationToken, throwOnError: false);
+        return exitCode == 0;
     }
 
     public async Task StartServiceAsync(string serviceName, CancellationToken cancellationToken = default)
@@ -76,7 +90,7 @@ public sealed class SystemctlService : ISystemService
         }
 
         var verb = parts[0];
-        if (verb is not ("start" or "stop" or "restart" or "is-active"))
+        if (verb is not ("start" or "stop" or "restart" or "is-active" or "cat"))
         {
             return systemctlArguments;
         }

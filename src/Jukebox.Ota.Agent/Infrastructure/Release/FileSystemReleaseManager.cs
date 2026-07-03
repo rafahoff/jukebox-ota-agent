@@ -18,7 +18,8 @@ public sealed class FileSystemReleaseManager : IReleaseManager
         var currentTarget = ResolveSymlinkTargetName(config.CurrentSymlink);
         if (string.IsNullOrEmpty(currentTarget))
         {
-            throw new InvalidOperationException($"Symlink current sem alvo: {config.CurrentSymlink}");
+            // Primeira instalação: ainda não há release current.
+            return Task.CompletedTask;
         }
 
         ReplaceSymlink(config.PreviousSymlink, Path.Combine(config.ReleasesDir, currentTarget));

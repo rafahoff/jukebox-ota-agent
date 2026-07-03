@@ -180,12 +180,48 @@ public class ApplyUpdateServiceTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_BootstrapSemUnitKiosk_ConcluiSemHealth()
+    {
+        var root = CreateTempLayout();
+        var configPath = WriteConfig(root, currentVersion: "");
+        var manifestPath = WriteManifest(root);
+        var packagePath = await CreatePackageAsync(root);
+
+        try
+        {
+            var ackSpy = new AckSpy();
+            var service = BuildService(
+                root,
+                ackSpy,
+                new FakeHealthChecker(success: false, errorCode: "health_check_timeout"),
+                systemService: new BootstrapSystemService());
+
+            var exitCode = await service.RunAsync(configPath, manifestPath, packagePath);
+
+            Assert.Equal(0, exitCode);
+            Assert.Single(ackSpy.Payloads);
+            Assert.Equal("success", ackSpy.Payloads[0].Result);
+            Assert.Equal("1.4.2", ackSpy.Payloads[0].VersionCurrent);
+
+            var currentTarget = Directory.ResolveLinkTarget(Path.Combine(root, "current"), returnFinalTarget: true);
+            Assert.NotNull(currentTarget);
+            Assert.EndsWith("1.4.2+aarch64", currentTarget.FullName, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static ApplyUpdateService BuildService(
         string root,
         AckSpy ackSpy,
         IHealthChecker healthChecker,
         OtaCheckPolicy? policy = null,
-        IOtaUpdateStatusStore? statusStore = null)
+        IOtaUpdateStatusStore? statusStore = null,
+        ISystemService? systemService = null,
+        bool seedCurrentRelease = true)
     {
         var effectivePolicy = policy ?? OtaCheckPolicy.Default;
         var effectiveStatusStore = statusStore ?? new InMemoryStatusStore();
@@ -205,14 +241,17 @@ public class ApplyUpdateServiceTests
             7);
 
         var releaseManager = new FileSystemReleaseManager();
-        SeedCurrentRelease(root, config);
+        if (seedCurrentRelease)
+        {
+            SeedCurrentRelease(root, config);
+        }
 
         return new ApplyUpdateService(
             new JsonConfigLoader(),
             new OtaConfigVersionSync(new JsonConfigWriter(), releaseManager),
             new JsonManifestLoader(),
             new FakePackageVerifier(),
-            new FakeSystemService(),
+            systemService ?? new FakeSystemService(),
             releaseManager,
             new FileSystemBackupService(),
             healthChecker,
@@ -250,7 +289,7 @@ public class ApplyUpdateServiceTests
         return root;
     }
 
-    private static string WriteConfig(string root)
+    private static string WriteConfig(string root, string currentVersion = "1.4.1")
     {
         var path = Path.Combine(root, "ota-agent.json");
         File.WriteAllText(path, $$"""
@@ -258,7 +297,7 @@ public class ApplyUpdateServiceTests
               "device_id": "machine-test",
               "channel": "beta",
               "ota_base_url": "file:///tmp/manifest.json",
-              "current_version": "1.4.1",
+              "current_version": "{{currentVersion}}",
               "public_key_path": "",
               "kiosk_service_name": "fake_kiosk",
               "releases_dir": "{{Path.Combine(root, "releases").Replace("\\", "\\\\")}}",
@@ -319,6 +358,24 @@ public class ApplyUpdateServiceTests
 
         public Task<bool> IsServiceActiveAsync(string serviceName, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
+
+        public Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+    }
+
+    private sealed class BootstrapSystemService : ISystemService
+    {
+        public Task StopServiceAsync(string serviceName, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task StartServiceAsync(string serviceName, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("start não deveria ser chamado em bootstrap");
+
+        public Task<bool> IsServiceActiveAsync(string serviceName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
     }
 
     private sealed class FakeHealthChecker : IHealthChecker

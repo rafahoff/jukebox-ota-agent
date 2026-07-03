@@ -27,7 +27,14 @@ public sealed class FileSystemBackupService : IBackupService
         var dataDir = ResolveKioskDataDir(config);
         if (!Directory.Exists(dataDir))
         {
-            throw new DirectoryNotFoundException($"Dados do kiosk não encontrados: {dataDir}");
+            return Task.FromResult(backupDir);
+        }
+
+        var hasDb = DatabaseFiles.Any(fileName => File.Exists(Path.Combine(dataDir, fileName)));
+        if (!hasDb && !File.Exists(Path.Combine(dataDir, "shared_preferences.json")))
+        {
+            // Bootstrap: kiosk ainda sem SQLite/prefs — backup vazio.
+            return Task.FromResult(backupDir);
         }
 
         foreach (var fileName in DatabaseFiles)

@@ -8,4 +8,7 @@ public interface ISystemService
     Task StartServiceAsync(string serviceName, CancellationToken cancellationToken = default);
 
     Task<bool> IsServiceActiveAsync(string serviceName, CancellationToken cancellationToken = default);
+
+    /// <summary>True se a unit existe (ficheiro carregado pelo systemd).</summary>
+    Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default);
 }
