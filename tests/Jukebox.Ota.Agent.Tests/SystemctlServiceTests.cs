@@ -21,4 +21,15 @@ public sealed class SystemctlServiceTests
         var normalized = SystemctlService.NormalizeSystemctlArguments(input);
         Assert.Equal(expected, normalized);
     }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(3, true)]
+    [InlineData(4, false)]
+    [InlineData(1, false)]
+    public void IsServiceUnitInstalledFromIsActiveExitCode_InterpretaCodigosSystemd(int exitCode, bool expectedInstalled)
+    {
+        var installed = SystemctlService.IsServiceUnitInstalledFromIsActiveExitCode(exitCode);
+        Assert.Equal(expectedInstalled, installed);
+    }
 }

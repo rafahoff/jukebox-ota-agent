@@ -20,11 +20,19 @@ public sealed class SystemctlService : ISystemService
             $"systemctl stop {serviceName} falhou (exit {exitCode})");
     }
 
+    /// <summary>
+    /// Detecta se a unit existe via <c>systemctl is-active</c> (permitido no sudoers do Pi).
+    /// Exit 0 (active) ou 3 (inactive/failed) ⇒ instalada; 4 ⇒ not-found.
+    /// </summary>
     public async Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default)
     {
-        var exitCode = await RunSystemctlAsync($"cat {serviceName}", cancellationToken, throwOnError: false);
-        return exitCode == 0;
+        var exitCode = await RunSystemctlAsync($"is-active {serviceName}", cancellationToken, throwOnError: false);
+        return IsServiceUnitInstalledFromIsActiveExitCode(exitCode);
     }
+
+    /// <summary>Interpreta exit code de <c>systemctl is-active</c> para presença da unit.</summary>
+    public static bool IsServiceUnitInstalledFromIsActiveExitCode(int exitCode) =>
+        exitCode is 0 or 3;
 
     public async Task StartServiceAsync(string serviceName, CancellationToken cancellationToken = default)
     {

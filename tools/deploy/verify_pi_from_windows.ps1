@@ -94,6 +94,15 @@ if (-not $sshOk) {
     $cfgExists = ($LASTEXITCODE -eq 0) -and ($cfgOut -match "EXISTS")
     Add-Check -Name "Config ($ConfigPath)" -Pass $cfgExists -Detail $(if ($cfgExists) { "legível por $OtaUser" } else { "ausente ou sem permissão para $OtaUser" })
 
+    # 5a. Config gravável pelo utilizador OTA (current_version após apply)
+    if ($cfgExists -and $otaUserOk) {
+        $cfgWriteOut = Invoke-Ssh "sudo -n -u ${OtaUser} test -w '$ConfigPath' && echo WRITABLE || echo READONLY"
+        $cfgWritable = ($LASTEXITCODE -eq 0) -and ($cfgWriteOut -match "WRITABLE")
+        Add-Check -Name "Config gravável ($OtaUser)" -Pass $cfgWritable -Detail $(if ($cfgWritable) { "660 root:jukebox-ota" } else { "esperado chmod 660 — reexecute setup_primeira_instalacao_pi ou pi_install_ota.sh" })
+    } else {
+        Add-Check -Name "Config gravável ($OtaUser)" -Pass $false -Detail "ignorado (config ou utilizador OTA ausente)"
+    }
+
     # 5b. kiosk_service_name no JSON com sufixo .service (sudoers exige path literal)
     if ($cfgExists) {
         $svcNameCmd = @"
@@ -203,12 +212,18 @@ sudo -n -u ${OtaUser} '$BinaryPath' check --config /tmp/ota-agent-mock-verify.js
     Add-Check -Name "sudoers ($sudoersPath)" -Pass $sudoersExists -Detail $(if ($sudoersExists) { "presente" } else { "ausente — reexecute pi_install_ota.sh" })
 
     if ($sudoersExists -and $otaUserOk) {
-        $sysctlOut = Invoke-Ssh "sudo -n -u ${OtaUser} sudo -n /bin/systemctl is-active '$KioskService' 2>&1"
-        $sysctlOk = $LASTEXITCODE -eq 0
-        $sysctlDetail = ($sysctlOut | Out-String).Trim()
-        Add-Check -Name "systemctl kiosk (sudo -n como $OtaUser)" -Pass $sysctlOk -Detail $sysctlDetail
+        $sysctlOut = Invoke-Ssh "sudo -n -u ${OtaUser} sudo -n /bin/systemctl is-active '$KioskService' 2>&1; echo exit=`$?"
+        $sysctlText = ($sysctlOut | Out-String).Trim()
+        $sysctlOk = $sysctlText -match 'exit=0' -or $sysctlText -match 'exit=3'
+        $sysctlDetail = if ($sysctlOk) { $sysctlText } else { "$sysctlText (esperado active ou inactive, não not-found)" }
+        Add-Check -Name "systemctl is-active kiosk (sudo -n como $OtaUser)" -Pass $sysctlOk -Detail $sysctlDetail
+
+        $catOut = Invoke-Ssh "sudo -n -u ${OtaUser} sudo -n /bin/systemctl cat '$KioskService' 2>&1 | head -1"
+        $catOk = $LASTEXITCODE -eq 0
+        Add-Check -Name "systemctl cat kiosk (sudo -n como $OtaUser)" -Pass $catOk -Detail $(if ($catOk) { ($catOut | Out-String).Trim() } else { "ausente no sudoers — reexecute pi_install_ota.sh ou setup_primeira_instalacao_pi" })
     } else {
-        Add-Check -Name "systemctl kiosk (sudo -n como $OtaUser)" -Pass $false -Detail "ignorado (sudoers ou utilizador OTA ausente)"
+        Add-Check -Name "systemctl is-active kiosk (sudo -n como $OtaUser)" -Pass $false -Detail "ignorado (sudoers ou utilizador OTA ausente)"
+        Add-Check -Name "systemctl cat kiosk (sudo -n como $OtaUser)" -Pass $false -Detail "ignorado (sudoers ou utilizador OTA ausente)"
     }
 
     # 10. journalctl (se service instalada)

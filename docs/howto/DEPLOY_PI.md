@@ -129,7 +129,7 @@ Ações:
 O `apply` para/inicia o kiosk via `systemctl`. Como o agente corre como `jukebox-ota` (não root), o install grava um fragmento sudoers restrito:
 
 - Ficheiro: `/etc/sudoers.d/99-jukebox-ota-systemctl` (template em `packaging/sudoers/`)
-- Comandos permitidos: `start`, `stop`, `restart`, `is-active` **apenas** em `jukeeo_kiosk_flutterpi.service`
+- Comandos permitidos: `start`, `stop`, `restart`, `is-active`, `cat` **apenas** em `jukeeo_kiosk_flutterpi.service`
 - O binário invoca `sudo -n /bin/systemctl …` quando o euid ≠ 0
 
 Validar após install:

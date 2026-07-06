@@ -52,6 +52,9 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
 - [2026-06-19] **Backup pré-update no apply**
   Faça assim: origem `kiosk_data_dir` (`jukebox_library.db` + wal/shm + `shared_preferences.json`); destino `/opt/jukeeo/backups/pre-{versão}-{ts UTC}/`; `IBackupService` em `Infrastructure/Backup/FileSystemBackupService.cs`; rollback automático **não** restaura DB — ver `README.md` § Backup e `docs/API.md` § apply.
 
+- [2026-07-06] **Apply OTA parou kiosk e não reiniciou (bootstrap falso)**
+  Faça assim: `IsServiceUnitInstalledAsync` usa `systemctl is-active` (exit 0 ou 3 = instalada; 4 = ausente) — **não** `systemctl cat` (não estava no sudoers). `setup_primeira_instalacao_pi.ps1` grava `ota-agent.json` com `chmod 660` (`root:jukebox-ota`), não `644`. Sudoers inclui `cat` como reforço. Sintoma no journal: `apply de bootstrap concluído` com unit já presente. Validar: `sudo -u jukebox-ota test -w /etc/jukeeo/ota-agent.json`; `sudo -u jukebox-ota sudo -n systemctl is-active jukeeo_kiosk_flutterpi.service` (exit 0 ou 3).
+
 - [2026-06-25] **Download OTA — permissões `/var/lib/jukebox-ota/downloads/`**
   Faça assim: cache em `{state_directory}/downloads/` (plural, ADR 0002). Timer systemd corre como `jukebox-ota`; «Verificar agora» no kiosk corria como `jukebox` → **Access denied** ao gravar pacote. Correcção: `pi_install_ota.sh` cria `downloads/` com `chmod 2770` (grupo `jukebox-ota`); sudoers `99-jukebox-kiosk-ota-check` permite `sudo -n -u jukebox-ota … check`; unit com `ReadWritePaths=/var/lib/jukebox-ota`. Validar: `sudo -u jukebox touch /var/lib/jukebox-ota/downloads/.write-test` (membro do grupo) **e** `sudo -n -u jukebox-ota /opt/jukeeo/ota-agent/jukebox-ota-agent check --config /etc/jukeeo/ota-agent.json --force` como `jukebox`.
 
