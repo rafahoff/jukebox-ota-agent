@@ -4,7 +4,7 @@ Backlog curado **deste repositório**. Itens de fleet OTA partilhados com `jukeb
 
 **Links (Obsidian):** notas em `docs/` → **`[[NOME]]`** (nome do ficheiro sem extensão). Produto canónico em `jukeeo-knowledge/docs/`. **Código** (`src/`, `tests/`, `tools/`, `packaging/`) → caminhos entre crases. **Linear** → `[JUK-n](url)`.
 
-**Última revisão:** 2026-07-09 — criação do backlog local; sync Linear JUK-83 (auto-update do agente). POC fases 0–5 concluídas (JUK-62…JUK-70, espelhadas em `jukebox_tv/TODO.md` § 6).
+**Última revisão:** 2026-07-09 — JUK-83 (auto-update agente), JUK-84 (avaliar Windows). POC fases 0–5 concluídas (JUK-62…JUK-70).
 
 **Legenda:** **☐** = pendente; **`- [x]`** = concluída. Linhas com **[JUK-n](url)** estão espelhadas no Linear.
 
@@ -52,3 +52,11 @@ Contexto: [[BRAINSTORM_AUTO_UPDATE_AGENTE]] · [[PLANO_OTA_RASPBERRY_PI_SERVIDOR
 ## 4. Segurança e endurecimento (repo)
 
 ☐ **[[PLANO_SEGURANCA_OTA_PENDENCIAS]]** — pendências documentadas (verify obrigatório, chave pública no Pi, servidor).
+
+---
+
+## 5. Plataformas — Windows (avaliação)
+
+Contexto: agente validado em **Pi** (`linux-arm64`); em Windows hoje só dev (`dotnet run`, testes). Plano de produto menciona `linux-x64`/WSL ([[PLANO_OTA_RASPBERRY_PI_SERVIDOR_PROPRIO]] §5.3), não Windows nativo.
+
+☐ **[JUK-84](https://linear.app/jukeeo/issue/JUK-84)** **Avaliar OTA Agent nativo Windows (`win-x64`)** — casos de uso (kiosk Windows, homologação sem Pi), publish self-contained, serviço/Task Scheduler, layout de instalação, ciclo `apply`, alternativa WSL-only vs agente nativo.
