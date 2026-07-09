@@ -14,6 +14,6 @@ alwaysApply: true
 - **Arquitetura**: skill `dotnet-architecting-apps`; testes `dotnet-testing-apps`.
 - **Scripts**: deploy em `tools/deploy/`; workarounds em `tools/`.
 - **Dependências NuGet**: não adicionar sem pedido explícito do usuário.
-- **Workspace**: `jukeeo.code-workspace` na pasta pai.
+- **Workspace**: `jukeeo-knowledge/jukeeo.code-workspace` (repos irmãos sob a pasta pai).
 - **Fronteiras**: sem lógica de kiosk/sync; sem swap de bundle até fase pós-POC.
 - **Commits**: formato `tipo(escopo): descrição` em português (feat, fix, test, docs, chore).

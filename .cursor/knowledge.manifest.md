@@ -23,4 +23,4 @@ Pasta pai: `C:\GitHub\jukebox\` (`jukeeo-knowledge`, `jukebox_tv`, `jukebox-ota-
 
 ## Workspace Cursor
 
-`C:\GitHub\jukebox\jukeeo.code-workspace`
+`C:\GitHub\jukebox\jukeeo-knowledge\jukeeo.code-workspace`

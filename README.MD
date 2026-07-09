@@ -217,4 +217,4 @@ Documentação detalhada do script: [`tools/README.md`](tools/README.md#ota_depl
 
 ## Workspace Cursor
 
-Abrir `C:\GitHub\jukebox\jukeeo.code-workspace` (inclui `jukeeo-knowledge`, `jukebox_tv` e este repo).
+Abrir `C:\GitHub\jukebox\jukeeo-knowledge\jukeeo.code-workspace` (inclui `jukeeo-knowledge`, `jukebox_tv` e este repo).
