@@ -4,6 +4,7 @@ Taxonomia do vault **local** (repo de código). Produto e brainstorm ficam em `j
 
 | Pasta | Conteúdo |
 |-------|----------|
+| `docs/brainstorm/` | Brainstorm repo-local (ex.: auto-update do agente) |
 | `docs/plans/` | Planos de execução deste repo |
 | `docs/plans/archive/` | Planos concluídos |
 | `docs/howto/` | Guias operacionais (deploy Pi, systemd) |

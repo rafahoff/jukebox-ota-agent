@@ -20,7 +20,9 @@ Agente de atualização over-the-air (OTA) para quiosques Jukeeo — processo **
 | **Runtime Pi** | Utilizador `jukebox-ota`, units systemd + timer (`upgrade` automático), sudoers restrito para `systemctl` do kiosk |
 | **Observabilidade** | Stdout → journald (`SyslogIdentifier=jukebox-ota`); log opcional em ficheiro |
 
-**Fora deste repo (backlog ou futuro):** servidor OTA produção JUK-72 (`jukebox-ota-server`), pipeline fleet off-device ([JUK-71](https://linear.app/jukeeo/issue/JUK-71)), TLS agente↔servidor ([JUK-73](https://linear.app/jukeeo/issue/JUK-73)), auto-update do próprio binário do agente.
+**Fora deste repo (backlog ou futuro):** servidor OTA produção JUK-72 (`jukebox-ota-server`), pipeline fleet off-device ([JUK-71](https://linear.app/jukeeo/issue/JUK-71)), TLS agente↔servidor ([JUK-73](https://linear.app/jukeeo/issue/JUK-73)).
+
+**Auto-update do binário do agente (pós-v1):** fora de escopo na v1 (deploy manual `ota_deploy_to_pi.ps1`); roadmap em `TODO.MD` § 3 · [[BRAINSTORM_AUTO_UPDATE_AGENTE]] · [JUK-83](https://linear.app/jukeeo/issue/JUK-83).
 
 **Servidor OTA de desenvolvimento:** [`jukebox-ota-server-dev`](https://github.com/rafahoff/jukebox-ota-server-dev) (Docker, paliativo para testes).
 

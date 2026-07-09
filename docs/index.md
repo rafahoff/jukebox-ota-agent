@@ -12,6 +12,8 @@ Ponto de entrada para agentes neste repositório.
 
 | Nota | Tema |
 |------|------|
+| `TODO.MD` | Backlog local (§ 3 auto-update agente — [JUK-83](https://linear.app/jukeeo/issue/JUK-83)) |
+| [[BRAINSTORM_AUTO_UPDATE_AGENTE]] | Brainstorm auto-update do binário do agente (pós-v1) |
 | [[PLANO_POC_DOTNET_PI]] | POC .NET no Raspberry Pi (fases 0–5) |
 | [[PLANO_SEGURANCA_OTA_PENDENCIAS]] | Pendências de segurança — servidor, verify, chave pública no Pi |
 | [[PLANO_OTA_CHECK_DOWNLOAD_APPLY]] | `check` com download, `upgrade` só apply, grace period (ADR 0002) |
