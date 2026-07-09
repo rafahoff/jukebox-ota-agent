@@ -214,6 +214,8 @@ public sealed class CheckUpdateService
 
 
 
+            FileAgentLogger.LogCheck("Consultando servidor OTA…");
+
             var manifest = await _otaClient.CheckAsync(config, cancellationToken);
 
             var checkedAt = DateTimeOffset.UtcNow;

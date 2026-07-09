@@ -1,7 +1,9 @@
+using System.Text;
 using Jukebox.Ota.Agent.Application.Services;
 using Jukebox.Ota.Agent.Domain.ValueObjects;
 using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.ExternalServices;
+using Jukebox.Ota.Agent.Infrastructure.Logging;
 using Jukebox.Ota.Agent.Infrastructure.Manifest;
 using Jukebox.Ota.Agent.Infrastructure.Policy;
 using Jukebox.Ota.Agent.Infrastructure.Release;
@@ -10,12 +12,16 @@ using Jukebox.Ota.Agent.Infrastructure.Telemetry;
 
 namespace Jukebox.Ota.Agent.Tests;
 
+[Collection("FileAgentLogger")]
 public class CheckUpdateServiceTests
 {
     [Fact]
     public async Task RunAsync_ComFixtureLocal_BaixaPacoteERetornaReadyToApply()
     {
         var root = Path.Combine(Path.GetTempPath(), $"ota-check-{Guid.NewGuid():N}");
+        var logsDir = Path.Combine(Path.GetTempPath(), $"ota-check-logs-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(logsDir);
+        FileAgentLogger.TestLogsDirectoryOverride = logsDir;
 
         try
         {
@@ -39,12 +45,23 @@ public class CheckUpdateServiceTests
             Assert.True(File.Exists(OtaDownloadCache.GetManifestPath(config, fixture.RemoteVersion)));
             Assert.True(File.Exists(OtaDownloadCache.GetPackagePath(config, new Domain.Entities.UpdateManifest(
                 "jukeeo", fixture.RemoteVersion, "aarch64", "", "", "rsa-pss-sha256", DateTimeOffset.UtcNow))));
+
+            var logContent = File.ReadAllText(
+                Path.Combine(logsDir, "jukebox_ota_agent.log"),
+                Encoding.UTF8);
+            Assert.Contains("check: Consultando servidor OTA…", logContent);
+            Assert.Contains($"check: Atualização disponível: {fixture.RemoteVersion}", logContent);
         }
         finally
         {
+            FileAgentLogger.TestLogsDirectoryOverride = null;
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);
+            }
+            if (Directory.Exists(logsDir))
+            {
+                Directory.Delete(logsDir, recursive: true);
             }
         }
     }
