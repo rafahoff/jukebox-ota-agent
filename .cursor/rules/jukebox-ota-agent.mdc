@@ -5,7 +5,7 @@ alwaysApply: true
 
 # jukebox-ota-agent — contexto do agente
 
-- **Idioma**: respostas e comentários em código em **português do Brasil**.
+- **Idioma**: respostas, **comentários em código**, **strings de log/UI**, napkin e **mensagens de commit** em **português do Brasil** — **nunca** português de Portugal. Exemplos: *atualizando* / *atualização* (não *actualizando* / *actualização*), *baixando* (não *descarregando*), *arquivo* (não *ficheiro*), *usuário* (não *utilizador*), *seção* (não *secção*), *ativo* (não *activo*), *correta* (não *correcta*). Antes do merge, revisar strings novas com `rg` por grafias europeias (`actual`, `ficheiro`, `utilizador`, `descarreg`, `secção`, `activo`).
 - **Escopo**: alterar só o necessário; POC OTA separada do kiosk Flutter.
 - **Manifesto**: ler `.cursor/knowledge.manifest.md` — produto (`jukeeo-knowledge`) → `docs/index.md` → notas linkadas.
 - **Planos**: criar em `docs/plans/`; concluídos em `docs/plans/archive/`. Brainstorm em `jukeeo-knowledge/docs/brainstorm/`.
@@ -16,4 +16,4 @@ alwaysApply: true
 - **Dependências NuGet**: não adicionar sem pedido explícito do usuário.
 - **Workspace**: `jukeeo-knowledge/jukeeo.code-workspace` (repos irmãos sob a pasta pai).
 - **Fronteiras**: sem lógica de kiosk/sync; sem swap de bundle até fase pós-POC.
-- **Commits**: formato `tipo(escopo): descrição` em português (feat, fix, test, docs, chore).
+- **Commits**: formato `tipo(escopo): descrição` em português do Brasil (feat, fix, test, docs, chore).

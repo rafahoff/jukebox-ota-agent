@@ -126,8 +126,8 @@ public sealed class ApplyUpdateService
             await _systemService.StopServiceAsync(config.KioskServiceName, cancellationToken);
             kioskStopped = true;
 
-            Console.WriteLine("Actualizando symlink previous ← current...");
-            FileAgentLogger.LogApply("Actualizando symlink previous ← current...");
+            Console.WriteLine("Atualizando symlink previous ← current...");
+            FileAgentLogger.LogApply("Atualizando symlink previous ← current...");
             await _releaseManager.PointPreviousToCurrentAsync(config, cancellationToken);
 
             Console.WriteLine("Criando backup pré-update...");

@@ -334,9 +334,9 @@ public sealed class CheckUpdateService
 
 
 
-            Console.WriteLine($"Descarregando pacote {manifest.Version}+{manifest.Arch}...");
+            Console.WriteLine($"Baixando pacote {manifest.Version}+{manifest.Arch}...");
 
-            FileAgentLogger.LogCheck($"Descarregando pacote {manifest.Version}+{manifest.Arch}...");
+            FileAgentLogger.LogCheck($"Baixando pacote {manifest.Version}+{manifest.Arch}...");
 
             var packagePath = await _otaClient.DownloadPackageAsync(config, manifest, downloadDir, cancellationToken);
 

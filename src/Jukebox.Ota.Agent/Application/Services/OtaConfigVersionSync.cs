@@ -21,7 +21,7 @@ public sealed class OtaConfigVersionSync
     }
 
     /// <summary>
-    /// Se a release instalada diverge do config, actualiza o JSON e devolve config em memória coerente.
+    /// Se a release instalada diverge do config, atualiza o JSON e devolve config em memória coerente.
     /// </summary>
     public OtaAgentConfig ResolveAndSync(string configPath, OtaAgentConfig config)
     {
@@ -50,7 +50,7 @@ public sealed class OtaConfigVersionSync
     public void PersistCurrentVersion(string configPath, string version)
     {
         _configWriter.UpdateCurrentVersion(configPath, version);
-        Console.WriteLine($"current_version actualizada no config: {version}");
-        FileAgentLogger.LogApply($"current_version actualizada no config: {version}");
+        Console.WriteLine($"current_version atualizada no config: {version}");
+        FileAgentLogger.LogApply($"current_version atualizada no config: {version}");
     }
 }

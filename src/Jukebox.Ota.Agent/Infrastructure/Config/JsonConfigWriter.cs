@@ -30,7 +30,7 @@ public sealed class JsonConfigWriter
         node["current_version"] = version;
         var output = node.ToJsonString(Options) + Environment.NewLine;
 
-        // Gravação in-place: grupo jukebox-ota tem escrita no ficheiro (660) mas não no diretório /etc/jukeeo.
+        // Gravação in-place: grupo jukebox-ota tem escrita no arquivo (660) mas não no diretório /etc/jukeeo.
         File.WriteAllText(path, output);
     }
 }

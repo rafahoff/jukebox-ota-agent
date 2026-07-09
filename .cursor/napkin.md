@@ -1,12 +1,17 @@
 # Napkin — runbook
 
-Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.cursor/skills/napkin/SKILL.md`.
+Runbook curado do **jukebox-ota-agent**. Idioma: **português do Brasil** (nunca Portugal). Skill: `.cursor/skills/napkin/SKILL.md`.
 
 ## Regras de curadoria
 
 - Reordenar a cada leitura por importância.
 - Máx. 10 itens por categoria.
 - Cada item: data `[YYYY-MM-DD]` + **Faça assim:**
+
+## Diretivas do usuário / time
+
+- [2026-07-09] **Textos: português do Brasil (não Portugal)**
+  Faça assim: logs, comentários, commits, napkin e docs em **pt-BR** — ex.: *atualizando* (não *actualizando*), *baixando* (não *descarregando*), *arquivo* (não *ficheiro*), *usuário* (não *utilizador*). Revisar com `rg` por grafias europeias antes do merge. Regra espelhada em `.cursor/rules/jukebox-ota-agent.mdc` e `.cursorrules`.
 
 ## Execução e validação (prioridade máxima)
 
@@ -62,7 +67,7 @@ Runbook curado do **jukebox-ota-agent**. Idioma: português (Brasil). Skill: `.c
   Faça assim: `check` = HTTP + download + verificação → `phase=ready_to_apply` em `{state_directory}/downloads/`; `upgrade` = apply-only do cache (sem novo HTTP). Regra A2: recusa apply se versão em cache ≠ `remote_version`.
 
 - [2026-06-25] **Timer systemd só `check` (ADR 0002)**
-  Faça assim: `jukebox_ota_agent.service` → `check --config /etc/jukeeo/ota-agent.json`; `SuccessExitStatus=0 2`. Apply automático: kiosk após grace period (`systemd-run upgrade`); apply manual: Definições → «Actualizar agora».
+  Faça assim: `jukebox_ota_agent.service` → `check --config /etc/jukeeo/ota-agent.json`; `SuccessExitStatus=0 2`. Apply automático: kiosk após grace period (`systemd-run upgrade`); apply manual: Definições → «Atualizar agora».
 
 - [2026-06-25] **ProtectHome e política OTA no timer (check)**
   Faça assim: unit check com `ProtectHome=read-only` + `ReadWritePaths` em `kiosk_data_dir` e logs. Sem leitura do SQLite → intervalo default 30 min (ignora UI 5 min). Unit de `upgrade` (systemd-run) precisa `NoNewPrivileges=no` e paths `/opt/jukeeo/*` — ver sudoers apply.

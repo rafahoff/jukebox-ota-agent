@@ -7,7 +7,7 @@ using Jukebox.Ota.Agent.Infrastructure.Policy;
 
 namespace Jukebox.Ota.Agent.Application.Services;
 
-/// <summary>Aplica pacote OTA já descarregado pelo <see cref="CheckUpdateService"/> (apply-only).</summary>
+/// <summary>Aplica pacote OTA já baixado pelo <see cref="CheckUpdateService"/> (apply-only).</summary>
 public sealed class UpgradeUpdateService
 {
     private readonly JsonConfigLoader _configLoader;

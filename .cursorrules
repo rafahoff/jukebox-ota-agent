@@ -1,0 +1,15 @@
+# Regras para geração de mensagens de commit — jukebox-ota-agent
+
+## Idioma
+- Sempre gere mensagens de commit e comentários de código em **português do Brasil**
+- **Nunca** usar português de Portugal (ex.: *actualizar*, *ficheiro*, *utilizador*, *descarregar*, *secção*, *activo*)
+- Use linguagem clara
+- Siga as convenções de commit em português do Brasil
+
+## Formato
+- `tipo(escopo): descrição breve` — imperativo
+- Tipos: feat, fix, docs, style, refactor, test, chore
+
+## Contexto
+- Agente OTA .NET no Raspberry Pi (check / verify / apply / upgrade)
+- Logs e strings visíveis no kiosk devem estar em pt-BR

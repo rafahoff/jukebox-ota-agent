@@ -7,7 +7,7 @@ alwaysApply: false
 # .NET — jukebox-ota-agent
 
 - Target: **net8.0**; publish Pi: `linux-arm64` self-contained.
-- Nullable reference types activos.
+- Nullable reference types ativos.
 - Camadas: `Domain` → `Application` → `Infrastructure` / `Interfaces`.
 - Interfaces de repositório/serviço no **Domain**; implementação na **Infrastructure**.
 - `Program.cs` apenas composição; sem regra de negócio.

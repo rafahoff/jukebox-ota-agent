@@ -151,7 +151,7 @@ public static class FileAgentLogger
         File.Move(logPath, rotatedPath, overwrite: true);
     }
 
-    /// <summary>644 para o utilizador kiosk ler o ficheiro (grupo/outros com leitura).</summary>
+    /// <summary>644 para o usuário kiosk ler o arquivo (grupo/outros com leitura).</summary>
     private static void TryMakeLogReadableByKiosk(string logPath)
     {
         if (!OperatingSystem.IsLinux())
