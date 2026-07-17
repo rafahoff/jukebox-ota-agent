@@ -256,13 +256,9 @@ public sealed class CheckUpdateService
 
 
 
-            var updateAvailable = !string.Equals(
-
+            var updateAvailable = OtaVersionComparer.IsNewer(
                 manifest.Version,
-
-                config.CurrentVersion,
-
-                StringComparison.Ordinal);
+                config.CurrentVersion);
 
 
 
@@ -270,9 +266,9 @@ public sealed class CheckUpdateService
 
             {
 
-                Console.WriteLine($"Versão remota {manifest.Version} coincide com a atual.");
+                Console.WriteLine($"Versão remota {manifest.Version} não é mais recente que a atual ({config.CurrentVersion}).");
 
-                FileAgentLogger.LogCheck($"Versão remota {manifest.Version} coincide com a atual.");
+                FileAgentLogger.LogCheck($"Versão remota {manifest.Version} não é mais recente que a atual ({config.CurrentVersion}).");
 
                 _telemetry.ReportCheckResult(config.DeviceId, false, manifest.Version, null);
 

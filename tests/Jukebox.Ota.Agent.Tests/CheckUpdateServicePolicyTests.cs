@@ -119,6 +119,43 @@ public class CheckUpdateServicePolicyTests
     }
 
     [Fact]
+    public async Task RunAsync_VersaoRemotaMaisAntiga_NaoOfereceAtualizacao()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"ota-policy-{Guid.NewGuid():N}");
+
+        try
+        {
+            var fixture = await OtaTestFixture.CreateAsync(
+                root,
+                remoteVersion: "1.0.32",
+                currentVersion: "1.0.34");
+            using var client = new HttpOtaUpdateClient();
+            var statusStore = new InMemoryStatusStore();
+            var service = new CheckUpdateService(
+                new JsonConfigLoader(),
+                new OtaConfigVersionSync(new JsonConfigWriter(), new FileSystemReleaseManager()),
+                client,
+                new ConsoleTelemetryReporter(),
+                new FakePolicyProvider(OtaCheckPolicy.Default),
+                statusStore,
+                new RsaPssPackageVerifier(),
+                new JsonManifestWriter());
+
+            var exitCode = await service.RunAsync(fixture.ConfigPath, force: true);
+
+            Assert.Equal(0, exitCode);
+            var config = new JsonConfigLoader().Load(fixture.ConfigPath);
+            var status = statusStore.Read(config);
+            Assert.False(status.UpdateAvailable);
+            Assert.Equal(OtaUpdatePhases.Idle, status.Phase);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_ComForce_IgnoraPoliticaEIntervalo()
     {
         var root = Path.Combine(Path.GetTempPath(), $"ota-policy-{Guid.NewGuid():N}");
