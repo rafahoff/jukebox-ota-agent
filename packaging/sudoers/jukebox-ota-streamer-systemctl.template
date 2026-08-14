@@ -1,0 +1,23 @@
+# Gerido por pi_install_ota.sh — não editar à mão no dispositivo.
+# Perfil jukeeo-streamer: stop/start das units do stack split (display + playback + HDMI).
+Defaults:jukebox-ota !requiretty
+Cmnd_Alias JUKEEO_STREAMER_SYSTEMCTL = \
+  /bin/systemctl start jukeeo-kiosk-display.service, \
+  /bin/systemctl stop jukeeo-kiosk-display.service, \
+  /bin/systemctl restart jukeeo-kiosk-display.service, \
+  /bin/systemctl is-active jukeeo-kiosk-display.service, \
+  /bin/systemctl cat jukeeo-kiosk-display.service, \
+  /bin/systemctl start jukeeo-playback.service, \
+  /bin/systemctl stop jukeeo-playback.service, \
+  /bin/systemctl restart jukeeo-playback.service, \
+  /bin/systemctl is-active jukeeo-playback.service, \
+  /bin/systemctl cat jukeeo-playback.service, \
+  /bin/systemctl start jukeeo-hdmi-prep.service, \
+  /bin/systemctl stop jukeeo-hdmi-prep.service, \
+  /bin/systemctl restart jukeeo-hdmi-prep.service, \
+  /bin/systemctl is-active jukeeo-hdmi-prep.service, \
+  /bin/systemctl cat jukeeo-hdmi-prep.service, \
+  /bin/systemctl start jukeeo-display-health.timer, \
+  /bin/systemctl is-active jukeeo-display-health.timer, \
+  /bin/systemctl cat jukeeo-display-health.timer
+jukebox-ota ALL=(root) NOPASSWD: JUKEEO_STREAMER_SYSTEMCTL

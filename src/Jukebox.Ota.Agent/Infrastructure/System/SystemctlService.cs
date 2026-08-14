@@ -45,6 +45,11 @@ public sealed class SystemctlService : ISystemService
         return exitCode == 0;
     }
 
+    public async Task StartTimerAsync(string timerName, CancellationToken cancellationToken = default)
+    {
+        await RunSystemctlAsync($"start {timerName}", cancellationToken);
+    }
+
     private static async Task<int> RunSystemctlAsync(
         string arguments,
         CancellationToken cancellationToken,
@@ -104,7 +109,8 @@ public sealed class SystemctlService : ISystemService
         }
 
         var unit = parts[1];
-        if (!unit.EndsWith(".service", StringComparison.Ordinal))
+        if (!unit.EndsWith(".service", StringComparison.Ordinal)
+            && !unit.EndsWith(".timer", StringComparison.Ordinal))
         {
             unit += ".service";
         }

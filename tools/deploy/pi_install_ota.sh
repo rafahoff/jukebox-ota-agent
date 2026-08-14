@@ -25,6 +25,7 @@ STATE_DIR="/var/lib/jukebox-ota"
 JUKEEO_ROOT="/opt/jukeeo"
 KIOSK_SERVICE="jukeeo_kiosk_flutterpi.service"
 KIOSK_USER="jukebox"
+SYSTEMCTL_SUDOERS_TEMPLATE="jukebox-ota-systemctl.template"
 SUDOERS_DEST="/etc/sudoers.d/99-jukebox-ota-systemctl"
 KIOSK_SUDOERS_DEST="/etc/sudoers.d/99-jukebox-kiosk-ota-check"
 ENABLE_TIMER=false
@@ -39,6 +40,8 @@ Opções:
   --install-dir <dir>       Destino do binário (padrão: /opt/jukeeo/ota-agent)
   --kiosk-service <unit>    Unit systemd do kiosk (padrão: jukeeo_kiosk_flutterpi.service)
   --kiosk-user <user>       Utilizador do kiosk para ACL de backup (padrão: jukebox)
+  --systemctl-sudoers <file> Template sudoers systemctl (padrão: jukebox-ota-systemctl.template;
+                            use jukebox-ota-streamer-systemctl.template no Orange Pi streamer)
   --enable-timer            Habilita e inicia jukebox_ota_agent.timer
   --force-config            Sobrescreve /etc/jukeeo/ota-agent.json se já existi
   -h, --help                Exibe esta ajuda
@@ -322,7 +325,11 @@ install_sudoers_fragment() {
   log "Instalando sudoers (${label})..."
 
   local tmp="${dest}.tmp"
-  sed "s/@KIOSK_SERVICE@/${KIOSK_SERVICE}/g" "$template" | tr -d '\r' > "$tmp"
+  if grep -q '@KIOSK_SERVICE@' "$template" 2>/dev/null; then
+    sed "s/@KIOSK_SERVICE@/${KIOSK_SERVICE}/g" "$template" | tr -d '\r' > "$tmp"
+  else
+    tr -d '\r' < "$template" > "$tmp"
+  fi
   chmod 440 "$tmp"
 
   if command -v visudo >/dev/null 2>&1; then
@@ -336,9 +343,9 @@ install_sudoers_fragment() {
 
 install_sudoers() {
   install_sudoers_fragment \
-    "${STAGING_DIR}/sudoers/jukebox-ota-systemctl.template" \
+    "${STAGING_DIR}/sudoers/${SYSTEMCTL_SUDOERS_TEMPLATE}" \
     "$SUDOERS_DEST" \
-    "${OTA_USER} → systemctl ${KIOSK_SERVICE}"
+    "${OTA_USER} → systemctl (${SYSTEMCTL_SUDOERS_TEMPLATE})"
 
   local kiosk_template="${STAGING_DIR}/sudoers/jukebox-kiosk-ota-check.template"
   if [[ -f "$kiosk_template" ]]; then
@@ -372,6 +379,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --kiosk-user)
       KIOSK_USER="${2:?--kiosk-user requer valor}"
+      shift 2
+      ;;
+    --systemctl-sudoers)
+      SYSTEMCTL_SUDOERS_TEMPLATE="${2:?--systemctl-sudoers requer valor}"
       shift 2
       ;;
     --enable-timer)

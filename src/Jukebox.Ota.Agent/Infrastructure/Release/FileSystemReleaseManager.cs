@@ -94,6 +94,28 @@ public sealed class FileSystemReleaseManager : IReleaseManager
         FolderGarbageCollector.Collect(config.ReleasesDir, protectedNames, config.MaxReleaseFolders);
     }
 
+    public Task SyncInstallRootSymlinkAsync(OtaAgentConfig config, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(config.InstallRootSymlink))
+        {
+            return Task.CompletedTask;
+        }
+
+        var currentTarget = Directory.ResolveLinkTarget(config.CurrentSymlink, returnFinalTarget: true)?.FullName;
+        if (string.IsNullOrWhiteSpace(currentTarget))
+        {
+            throw new InvalidOperationException($"Symlink current sem alvo: {config.CurrentSymlink}");
+        }
+
+        ReplaceSymlink(config.InstallRootSymlink, currentTarget);
+        return Task.CompletedTask;
+    }
+
+    public string? GetCurrentReleaseDirectory(OtaAgentConfig config) =>
+        Directory.ResolveLinkTarget(config.CurrentSymlink, returnFinalTarget: true)?.FullName;
+
     internal static string BuildReleaseFolderName(string version, string arch) => $"{version}+{arch}";
 
     private static void AddProtectedFolder(HashSet<string> protectedNames, string symlinkPath, string releasesDir)

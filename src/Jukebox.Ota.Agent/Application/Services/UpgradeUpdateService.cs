@@ -144,7 +144,7 @@ public sealed class UpgradeUpdateService
             return "aarch64";
         }
 
-        var prefix = $"jukeeo-{version}+";
+        var prefix = $"{OtaPackageNaming.ResolveApp(config.App)}-{version}+";
         foreach (var file in Directory.EnumerateFiles(downloadDir, $"{prefix}*.tar.zst"))
         {
             var fileName = Path.GetFileName(file);

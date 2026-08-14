@@ -14,7 +14,7 @@ public class HttpOtaUpdateClientDownloadTests
     [Fact]
     public void ResolveDownloadUrl_ComFixtureFile_UsaPacoteNoMesmoDiretorio()
     {
-        var manifestPath = @"C:\ota\manifest.json";
+        var manifestPath = Path.Combine(Path.GetTempPath(), "ota-fixture", "manifest.json");
         var config = new OtaAgentConfig(
             "machine-test",
             "beta",

@@ -6,13 +6,12 @@ using Jukebox.Ota.Agent.Infrastructure.Config;
 using Jukebox.Ota.Agent.Infrastructure.Logging;
 using Jukebox.Ota.Agent.Infrastructure.Manifest;
 using Jukebox.Ota.Agent.Infrastructure.Policy;
+using Jukebox.Ota.Agent.Infrastructure.Release;
 
 namespace Jukebox.Ota.Agent.Application.Services;
 
 public sealed class ApplyUpdateService
 {
-    private static readonly TimeSpan HealthTimeout = TimeSpan.FromSeconds(90);
-
     private readonly JsonConfigLoader _configLoader;
     private readonly OtaConfigVersionSync _versionSync;
     private readonly JsonManifestLoader _manifestLoader;
@@ -24,6 +23,7 @@ public sealed class ApplyUpdateService
     private readonly IOtaAckClient _ackClient;
     private readonly IOtaPolicyProvider _policyProvider;
     private readonly IOtaUpdateStatusStore _statusStore;
+    private readonly ReleasePostInstallRunner _postInstallRunner = new();
 
     public ApplyUpdateService(
         JsonConfigLoader configLoader,
@@ -62,6 +62,7 @@ public sealed class ApplyUpdateService
         config = _versionSync.ResolveAndSync(configPath, config);
         var manifest = _manifestLoader.Load(manifestPath);
         var versionPrevious = _releaseManager.GetCurrentReleaseVersion(config) ?? config.CurrentVersion;
+        string? lastBackupDir = null;
 
         WriteStatus(config, status => status with
         {
@@ -117,14 +118,18 @@ public sealed class ApplyUpdateService
             return 1;
         }
 
-        var kioskStopped = false;
+        var servicesStopped = false;
 
         try
         {
-            Console.WriteLine($"Parando {config.KioskServiceName}...");
-            FileAgentLogger.LogApply($"Parando {config.KioskServiceName}...");
-            await _systemService.StopServiceAsync(config.KioskServiceName, cancellationToken);
-            kioskStopped = true;
+            foreach (var service in config.ResolveStopServices())
+            {
+                Console.WriteLine($"Parando {service}...");
+                FileAgentLogger.LogApply($"Parando {service}...");
+                await _systemService.StopServiceAsync(service, cancellationToken);
+            }
+
+            servicesStopped = true;
 
             Console.WriteLine("Atualizando symlink previous ← current...");
             FileAgentLogger.LogApply("Atualizando symlink previous ← current...");
@@ -132,67 +137,73 @@ public sealed class ApplyUpdateService
 
             Console.WriteLine("Criando backup pré-update...");
             FileAgentLogger.LogApply("Criando backup pré-update...");
-            await _backupService.CreatePreUpdateBackupAsync(config, manifest.Version, cancellationToken);
+            lastBackupDir = await _backupService.CreatePreUpdateBackupAsync(config, manifest.Version, cancellationToken);
 
             Console.WriteLine($"Extraindo release {manifest.Version}+{manifest.Arch}...");
             FileAgentLogger.LogApply($"Extraindo release {manifest.Version}+{manifest.Arch}...");
             await _releaseManager.ExtractReleaseAsync(config, packagePath, manifest.Version, manifest.Arch, cancellationToken);
 
+            var releaseDir = Path.Combine(
+                config.ReleasesDir,
+                FileSystemReleaseManager.BuildReleaseFolderName(manifest.Version, manifest.Arch));
+
+            Console.WriteLine("Executando pós-install da release...");
+            FileAgentLogger.LogApply("Executando pós-install da release...");
+            await _postInstallRunner.RunAsync(config, releaseDir, cancellationToken);
+
             Console.WriteLine("Trocando symlink current...");
             FileAgentLogger.LogApply("Trocando symlink current...");
             await _releaseManager.SwapCurrentToReleaseAsync(config, manifest.Version, manifest.Arch, cancellationToken);
+            await _releaseManager.SyncInstallRootSymlinkAsync(config, cancellationToken);
 
-            var kioskUnitInstalled = await _systemService.IsServiceUnitInstalledAsync(config.KioskServiceName, cancellationToken);
-            if (!kioskUnitInstalled)
+            var primaryService = config.PrimaryHealthServiceName();
+            var primaryInstalled = await _systemService.IsServiceUnitInstalledAsync(primaryService, cancellationToken);
+            if (!primaryInstalled)
             {
                 Console.WriteLine(
-                    $"AVISO: {config.KioskServiceName} ainda não instalada — apply de bootstrap concluído (configure autostart e inicie o kiosk).");
-                FileAgentLogger.LogApply(
-                    $"bootstrap: unit {config.KioskServiceName} ausente — skip start/health");
+                    $"AVISO: {primaryService} ainda não instalada — apply de bootstrap concluído (configure autostart e inicie os serviços).");
+                FileAgentLogger.LogApply($"bootstrap: unit {primaryService} ausente — skip start/health");
                 CollectGarbageSafely(config);
                 await SendAckAsync(config, manifest, versionPrevious, manifest.Version, "success", null, null, cancellationToken);
-                try
-                {
-                    _versionSync.PersistCurrentVersion(configPath, manifest.Version);
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"AVISO: apply concluído mas current_version no config não foi gravada: {ex.Message}");
-                    FileAgentLogger.LogApply($"AVISO: current_version no config não gravada: {ex.Message}");
-                }
-
-                config = config with { CurrentVersion = manifest.Version };
-                WriteStatus(config, status => status with
-                {
-                    Phase = OtaUpdatePhases.Idle,
-                    CurrentVersion = manifest.Version,
-                    RemoteVersion = null,
-                    UpdateAvailable = false,
-                    ErrorMessage = null,
-                });
+                await PersistVersionAsync(configPath, config, manifest.Version);
+                WriteSuccessStatus(config, manifest.Version);
                 Console.WriteLine($"Apply concluído (bootstrap): {manifest.Version}");
                 FileAgentLogger.LogApply($"concluído (bootstrap): {manifest.Version}");
                 return 0;
             }
 
-            Console.WriteLine($"Iniciando {config.KioskServiceName}...");
-            FileAgentLogger.LogApply($"Iniciando {config.KioskServiceName}...");
-            await _systemService.StartServiceAsync(config.KioskServiceName, cancellationToken);
+            foreach (var service in config.ResolveStartServices())
+            {
+                Console.WriteLine($"Iniciando {service}...");
+                FileAgentLogger.LogApply($"Iniciando {service}...");
+                await _systemService.StartServiceAsync(service, cancellationToken);
+            }
 
+            if (config.StartTimers is { Count: > 0 })
+            {
+                foreach (var timer in config.StartTimers)
+                {
+                    Console.WriteLine($"Iniciando timer {timer}...");
+                    FileAgentLogger.LogApply($"Iniciando timer {timer}...");
+                    await _systemService.StartTimerAsync(timer, cancellationToken);
+                }
+            }
+
+            var healthTimeout = TimeSpan.FromSeconds(Math.Max(30, config.HealthTimeoutSeconds));
             Console.WriteLine($"Aguardando health ({config.HealthUrl})...");
             FileAgentLogger.LogApply($"Aguardando health ({config.HealthUrl})...");
             var health = await _healthChecker.WaitForHealthyAsync(
-                config.KioskServiceName,
+                primaryService,
                 config.HealthUrl,
                 manifest.Version,
-                HealthTimeout,
+                healthTimeout,
                 cancellationToken);
 
             if (!health.Success)
             {
                 Console.Error.WriteLine($"Health falhou: {health.Message}");
                 FileAgentLogger.LogApply($"Health falhou: {health.Message}");
-                await RollbackAsync(config, cancellationToken);
+                await RollbackAsync(config, lastBackupDir, cancellationToken);
                 var rolledBackVersion = _releaseManager.GetCurrentReleaseVersion(config) ?? versionPrevious;
                 var rollbackMessage = OtaRollbackMessages.Format(
                     manifest.Version,
@@ -211,27 +222,9 @@ public sealed class ApplyUpdateService
             }
 
             CollectGarbageSafely(config);
-
             await SendAckAsync(config, manifest, versionPrevious, manifest.Version, "success", null, null, cancellationToken);
-            try
-            {
-                _versionSync.PersistCurrentVersion(configPath, manifest.Version);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"AVISO: apply concluído mas current_version no config não foi gravada: {ex.Message}");
-                FileAgentLogger.LogApply($"AVISO: current_version no config não gravada: {ex.Message}");
-            }
-
-            config = config with { CurrentVersion = manifest.Version };
-            WriteStatus(config, status => status with
-            {
-                Phase = OtaUpdatePhases.Idle,
-                CurrentVersion = manifest.Version,
-                RemoteVersion = null,
-                UpdateAvailable = false,
-                ErrorMessage = null,
-            });
+            await PersistVersionAsync(configPath, config, manifest.Version);
+            WriteSuccessStatus(config, manifest.Version);
             Console.WriteLine($"Apply concluído: {manifest.Version}");
             FileAgentLogger.LogApply($"concluído: {manifest.Version}");
             return 0;
@@ -242,11 +235,11 @@ public sealed class ApplyUpdateService
             FileAgentLogger.LogApply($"falhou: {ex.Message}");
             WriteApplyError(config, ex.Message);
 
-            if (kioskStopped)
+            if (servicesStopped)
             {
                 try
                 {
-                    await RollbackAsync(config, cancellationToken);
+                    await RollbackAsync(config, lastBackupDir, cancellationToken);
                     var rolledBackVersion = _releaseManager.GetCurrentReleaseVersion(config) ?? versionPrevious;
                     var rollbackMessage = OtaRollbackMessages.Format(
                         manifest.Version,
@@ -276,7 +269,6 @@ public sealed class ApplyUpdateService
         }
     }
 
-    /// GC após health OK — falha de permissão em backup antigo não deve invalidar o apply.
     private void CollectGarbageSafely(OtaAgentConfig config)
     {
         try
@@ -291,16 +283,67 @@ public sealed class ApplyUpdateService
         }
     }
 
-    private async Task RollbackAsync(Domain.ValueObjects.OtaAgentConfig config, CancellationToken cancellationToken)
+    private async Task RollbackAsync(
+        OtaAgentConfig config,
+        string? backupDir,
+        CancellationToken cancellationToken)
     {
         Console.WriteLine("Executando rollback current → previous...");
         FileAgentLogger.LogApply("Executando rollback current → previous...");
         await _releaseManager.RollbackCurrentToPreviousAsync(config, cancellationToken);
-        await _systemService.StartServiceAsync(config.KioskServiceName, cancellationToken);
+        await _releaseManager.SyncInstallRootSymlinkAsync(config, cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(backupDir))
+        {
+            Console.WriteLine($"Restaurando backup data_dir de {backupDir}...");
+            FileAgentLogger.LogApply($"Restaurando backup data_dir de {backupDir}...");
+            await _backupService.RestorePreUpdateBackupAsync(config, backupDir, cancellationToken);
+        }
+
+        foreach (var service in config.ResolveStartServices())
+        {
+            await _systemService.StartServiceAsync(service, cancellationToken);
+        }
+
+        if (config.StartTimers is { Count: > 0 })
+        {
+            foreach (var timer in config.StartTimers)
+            {
+                await _systemService.StartTimerAsync(timer, cancellationToken);
+            }
+        }
+    }
+
+    private async Task PersistVersionAsync(string configPath, OtaAgentConfig config, string version)
+    {
+        try
+        {
+            _versionSync.PersistCurrentVersion(configPath, version);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"AVISO: apply concluído mas current_version no config não foi gravada: {ex.Message}");
+            FileAgentLogger.LogApply($"AVISO: current_version no config não gravada: {ex.Message}");
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private void WriteSuccessStatus(OtaAgentConfig config, string version)
+    {
+        config = config with { CurrentVersion = version };
+        WriteStatus(config, status => status with
+        {
+            Phase = OtaUpdatePhases.Idle,
+            CurrentVersion = version,
+            RemoteVersion = null,
+            UpdateAvailable = false,
+            ErrorMessage = null,
+        });
     }
 
     private Task SendAckAsync(
-        Domain.ValueObjects.OtaAgentConfig config,
+        OtaAgentConfig config,
         UpdateManifest manifest,
         string versionPrevious,
         string versionCurrent,

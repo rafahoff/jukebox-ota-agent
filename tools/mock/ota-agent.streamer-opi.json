@@ -1,0 +1,41 @@
+{
+  "device_id": "opi-zero3-lab-110",
+  "app": "jukeeo-streamer",
+  "channel": "streamer-beta",
+  "arch": "aarch64",
+  "ota_base_url": "http://192.168.15.129:9080",
+  "current_version": "0.0.0",
+  "public_key_path": "/etc/jukeeo/ota-public-key.pem",
+  "stop_services": [
+    "jukeeo-kiosk-display.service",
+    "jukeeo-playback.service"
+  ],
+  "start_services": [
+    "jukeeo-hdmi-prep.service",
+    "jukeeo-playback.service",
+    "jukeeo-kiosk-display.service"
+  ],
+  "start_timers": [
+    "jukeeo-display-health.timer"
+  ],
+  "releases_dir": "/opt/jukeeo/streamer-ota/releases",
+  "current_symlink": "/opt/jukeeo/streamer-ota/current",
+  "previous_symlink": "/opt/jukeeo/streamer-ota/previous",
+  "install_root_symlink": "/opt/jukeeo/streamer",
+  "backups_dir": "/opt/jukeeo/streamer-ota/backups",
+  "health_url": "http://127.0.0.1:8081/health",
+  "health_timeout_seconds": 120,
+  "kiosk_data_dir": "/home/jukebox/.local/share/com.jukeeo.kiosk",
+  "backup_data_files": [
+    "streamer_state.json",
+    "connectivity.json",
+    "playback-display.json"
+  ],
+  "post_install_script": "display/post_install.sh",
+  "max_release_folders": 7,
+  "state_directory": "/var/lib/jukebox-ota",
+  "ota_check_enabled": true,
+  "ota_check_interval_minutes": 30,
+  "ota_check_window_start": "03:00",
+  "ota_check_window_end": "05:00"
+}
