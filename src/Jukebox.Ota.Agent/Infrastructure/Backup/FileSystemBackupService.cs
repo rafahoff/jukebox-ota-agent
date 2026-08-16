@@ -6,7 +6,7 @@ namespace Jukebox.Ota.Agent.Infrastructure.Backup;
 
 public sealed class FileSystemBackupService : IBackupService
 {
-    private static readonly string[] DatabaseFiles =
+    private static readonly string[] KioskDatabaseFiles =
     [
         "jukebox_library.db",
         "jukebox_library.db-wal",
@@ -30,14 +30,23 @@ public sealed class FileSystemBackupService : IBackupService
             return Task.FromResult(backupDir);
         }
 
-        var hasDb = DatabaseFiles.Any(fileName => File.Exists(Path.Combine(dataDir, fileName)));
-        if (!hasDb && !File.Exists(Path.Combine(dataDir, "shared_preferences.json")))
+        if (config.BackupDataFiles is { Count: > 0 })
         {
-            // Bootstrap: kiosk ainda sem SQLite/prefs — backup vazio.
+            foreach (var fileName in config.BackupDataFiles)
+            {
+                CopyIfExists(Path.Combine(dataDir, fileName), Path.Combine(backupDir, fileName));
+            }
+
             return Task.FromResult(backupDir);
         }
 
-        foreach (var fileName in DatabaseFiles)
+        var hasDb = KioskDatabaseFiles.Any(fileName => File.Exists(Path.Combine(dataDir, fileName)));
+        if (!hasDb && !File.Exists(Path.Combine(dataDir, "shared_preferences.json")))
+        {
+            return Task.FromResult(backupDir);
+        }
+
+        foreach (var fileName in KioskDatabaseFiles)
         {
             CopyIfExists(Path.Combine(dataDir, fileName), Path.Combine(backupDir, fileName));
         }
@@ -47,6 +56,30 @@ public sealed class FileSystemBackupService : IBackupService
             Path.Combine(backupDir, "shared_preferences.json"));
 
         return Task.FromResult(backupDir);
+    }
+
+    public Task RestorePreUpdateBackupAsync(
+        OtaAgentConfig config,
+        string backupDir,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!Directory.Exists(backupDir))
+        {
+            return Task.CompletedTask;
+        }
+
+        var dataDir = ResolveKioskDataDir(config);
+        Directory.CreateDirectory(dataDir);
+
+        foreach (var file in Directory.EnumerateFiles(backupDir))
+        {
+            var fileName = Path.GetFileName(file);
+            CopyIfExists(file, Path.Combine(dataDir, fileName));
+        }
+
+        return Task.CompletedTask;
     }
 
     public void CollectGarbage(string backupsDir, int maxFolders)

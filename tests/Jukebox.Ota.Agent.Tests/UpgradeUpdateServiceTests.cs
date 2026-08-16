@@ -185,6 +185,9 @@ public class UpgradeUpdateServiceTests
 
         public Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
+
+        public Task StartTimerAsync(string timerName, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class FakeHealthChecker : IHealthChecker

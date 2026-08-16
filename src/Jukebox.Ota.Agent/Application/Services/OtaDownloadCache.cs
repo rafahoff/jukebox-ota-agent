@@ -10,10 +10,14 @@ public static class OtaDownloadCache
         Path.Combine(config.StateDirectory, "downloads");
 
     public static string GetManifestPath(OtaAgentConfig config, string version) =>
-        Path.Combine(GetDownloadDirectory(config), $"jukeeo-{version}-manifest.json");
+        Path.Combine(
+            GetDownloadDirectory(config),
+            OtaPackageNaming.BuildManifestCacheFileName(config.App, version));
 
     public static string GetPackagePath(OtaAgentConfig config, UpdateManifest manifest) =>
-        Path.Combine(GetDownloadDirectory(config), $"jukeeo-{manifest.Version}+{manifest.Arch}.tar.zst");
+        Path.Combine(
+            GetDownloadDirectory(config),
+            OtaPackageNaming.BuildPackageFileName(manifest.App, manifest.Version, manifest.Arch));
 
     /// <summary>Verifica se manifesto e pacote existem para a versão indicada.</summary>
     public static bool TryResolveReadyCache(
@@ -24,7 +28,9 @@ public static class OtaDownloadCache
         out string packagePath)
     {
         manifestPath = GetManifestPath(config, version);
-        packagePath = Path.Combine(GetDownloadDirectory(config), $"jukeeo-{version}+{arch}.tar.zst");
+        packagePath = Path.Combine(
+            GetDownloadDirectory(config),
+            OtaPackageNaming.BuildPackageFileName(config.App, version, arch));
         return File.Exists(manifestPath) && File.Exists(packagePath);
     }
 
@@ -38,7 +44,8 @@ public static class OtaDownloadCache
             return false;
         }
 
-        foreach (var file in Directory.EnumerateFiles(downloadDir, "jukeeo-*-manifest.json"))
+        var prefix = $"{OtaPackageNaming.ResolveApp(config.App)}-";
+        foreach (var file in Directory.EnumerateFiles(downloadDir, $"{prefix}*-manifest.json"))
         {
             manifestPath = file;
             return true;

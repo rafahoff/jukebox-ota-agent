@@ -47,7 +47,7 @@ public sealed class HttpOtaUpdateClient : IOtaUpdateClient, IDisposable
     {
         Directory.CreateDirectory(destinationDirectory);
 
-        var fileName = $"jukeeo-{manifest.Version}+{manifest.Arch}.tar.zst";
+        var fileName = OtaPackageNaming.BuildPackageFileName(manifest.App, manifest.Version, manifest.Arch);
         var destinationPath = Path.Combine(destinationDirectory, fileName);
 
         var sourceUrl = ResolveDownloadUrl(config, manifest);
@@ -80,18 +80,15 @@ public sealed class HttpOtaUpdateClient : IOtaUpdateClient, IDisposable
             return manifest.DownloadUrl;
         }
 
+        var packageName = OtaPackageNaming.BuildPackageFileName(manifest.App, manifest.Version, manifest.Arch);
+
         if (config.OtaBaseUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
-            var manifestPath = new Uri(config.OtaBaseUrl).LocalPath;
-            var manifestDir = Path.GetDirectoryName(manifestPath)
-                ?? throw new InvalidOperationException($"Diretório do manifesto inválido: {manifestPath}");
-            var packageName = $"jukeeo-{manifest.Version}+{manifest.Arch}.tar.zst";
-            var packagePath = Path.Combine(manifestDir, packageName);
-            return new Uri(packagePath).AbsoluteUri;
+            return new Uri(new Uri(config.OtaBaseUrl), packageName).AbsoluteUri;
         }
 
         var baseUri = config.OtaBaseUrl.TrimEnd('/');
-        return $"{baseUri}/ota/{manifest.App}/{manifest.Version}/{manifest.Arch}/jukeeo-{manifest.Version}+{manifest.Arch}.tar.zst";
+        return $"{baseUri}/ota/{manifest.App}/{manifest.Version}/{manifest.Arch}/{packageName}";
     }
 
     private static Uri BuildCheckUri(OtaAgentConfig config)
@@ -100,6 +97,8 @@ public sealed class HttpOtaUpdateClient : IOtaUpdateClient, IDisposable
         var path = $"{baseUri}/v1/updates/check" +
                    $"?device_id={Uri.EscapeDataString(config.DeviceId)}" +
                    $"&channel={Uri.EscapeDataString(config.Channel)}" +
+                   $"&app={Uri.EscapeDataString(config.App)}" +
+                   $"&arch={Uri.EscapeDataString(config.Arch)}" +
                    $"&version={Uri.EscapeDataString(config.CurrentVersion)}";
         return new Uri(path);
     }

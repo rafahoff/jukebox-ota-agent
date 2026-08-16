@@ -23,4 +23,8 @@ public interface IReleaseManager
     Task RollbackCurrentToPreviousAsync(OtaAgentConfig config, CancellationToken cancellationToken = default);
 
     void CollectGarbage(OtaAgentConfig config);
+
+    Task SyncInstallRootSymlinkAsync(OtaAgentConfig config, CancellationToken cancellationToken = default);
+
+    string? GetCurrentReleaseDirectory(OtaAgentConfig config);
 }

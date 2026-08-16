@@ -11,4 +11,6 @@ public interface ISystemService
 
     /// <summary>True se a unit existe (arquivo carregado pelo systemd).</summary>
     Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default);
+
+    Task StartTimerAsync(string timerName, CancellationToken cancellationToken = default);
 }

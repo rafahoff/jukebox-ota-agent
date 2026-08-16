@@ -226,19 +226,19 @@ public class ApplyUpdateServiceTests
         var effectivePolicy = policy ?? OtaCheckPolicy.Default;
         var effectiveStatusStore = statusStore ?? new InMemoryStatusStore();
         var config = new OtaAgentConfig(
-            "machine-test",
-            "beta",
-            "file:///tmp/manifest.json",
-            "1.4.1",
-            string.Empty,
-            "fake_kiosk",
-            Path.Combine(root, "releases"),
-            Path.Combine(root, "current"),
-            Path.Combine(root, "previous"),
-            Path.Combine(root, "backups"),
-            "http://127.0.0.1:9/health",
-            Path.Combine(root, "kiosk-data"),
-            7);
+            DeviceId: "machine-test",
+            Channel: "beta",
+            OtaBaseUrl: "file:///tmp/manifest.json",
+            CurrentVersion: "1.4.1",
+            PublicKeyPath: string.Empty,
+            KioskServiceName: "fake_kiosk",
+            ReleasesDir: Path.Combine(root, "releases"),
+            CurrentSymlink: Path.Combine(root, "current"),
+            PreviousSymlink: Path.Combine(root, "previous"),
+            BackupsDir: Path.Combine(root, "backups"),
+            HealthUrl: "http://127.0.0.1:9/health",
+            KioskDataDir: Path.Combine(root, "kiosk-data"),
+            MaxReleaseFolders: 7);
 
         var releaseManager = new FileSystemReleaseManager();
         if (seedCurrentRelease)
@@ -361,6 +361,9 @@ public class ApplyUpdateServiceTests
 
         public Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
+
+        public Task StartTimerAsync(string timerName, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class BootstrapSystemService : ISystemService
@@ -376,6 +379,9 @@ public class ApplyUpdateServiceTests
 
         public Task<bool> IsServiceUnitInstalledAsync(string serviceName, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
+
+        public Task StartTimerAsync(string timerName, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class FakeHealthChecker : IHealthChecker
