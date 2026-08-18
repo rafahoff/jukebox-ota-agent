@@ -15,6 +15,9 @@ Runbook curado do **jukebox-ota-agent**. Idioma: **português do Brasil** (nunca
 
 ## Execução e validação (prioridade máxima)
 
+- [2026-08-17] **Primeira instalação OTA no streamer (`192.168.15.110`)**
+  Faça assim: `.\tools\deploy\ota_deploy_to_pi.ps1 -PiHost 192.168.15.110 -SkipInstall` na raiz (não aninhar `powershell -File` — PS 5.1 quebra o parse). No Pi: `sudo bash /tmp/jukebox-ota-staging/pi_install_ota.sh --systemctl-sudoers jukebox-ota-streamer-systemctl.template --force-config --enable-timer` com `tools/mock/ota-agent.streamer-opi.json`. ACL `u:jukebox:rx` em `/etc/jukeeo` para não quebrar `streamer.json`. `ota_base_url=https://ota.jukeeo.com`. `current_version` = versão do binário. Índice stub `streamer-beta` tem de coincidir (placeholder `0.0.0` seria oferecido como update). Validar: `check` exit 0; playback/display `active`.
+
 - [2026-06-18] **Decisão §7 — manter .NET (JUK-70)**
   Faça assim: POC fechada; linguagem definitiva .NET 8; critérios §7 OK (78 MiB, pico ~45 MiB, idle 0, startup <1s). Documentar em `docs/plans/PLANO_POC_DOTNET_PI.md` — não reavaliar Go salvo regressão material.
 

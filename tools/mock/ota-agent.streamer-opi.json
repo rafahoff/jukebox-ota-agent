@@ -1,10 +1,10 @@
 {
-  "device_id": "opi-zero3-lab-110",
+  "device_id": "orange-pi-110",
   "app": "jukeeo-streamer",
   "channel": "streamer-beta",
   "arch": "aarch64",
-  "ota_base_url": "http://192.168.15.129:9080",
-  "current_version": "0.0.0",
+  "ota_base_url": "https://ota.jukeeo.com",
+  "current_version": "0.6.19",
   "public_key_path": "/etc/jukeeo/ota-public-key.pem",
   "stop_services": [
     "jukeeo-kiosk-display.service",
