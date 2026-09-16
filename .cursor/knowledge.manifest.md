@@ -8,6 +8,7 @@ Manifesto lido pelos agentes **antes** de varrer documentação.
 | **Produto — OTA** | `../jukeeo-knowledge/docs/brainstorm/PLANO_JUKEBOX_OTA_AGENT_DOTNET_POC.md` | POC .NET no Pi |
 | **Repo** | `docs/index.md` | Planos, how-to, API local |
 | **Runbook** | `.cursor/napkin.md` | Publish Pi, systemd, journald |
+| **Segurança** | skill global `insecure-defaults` | Fail-secure OTA; não duplicar no repo; detalhes em [[PLANO_SEGURANCA_OTA_PENDENCIAS]] |
 | **Glossário** | `../jukeeo-knowledge/CONTEXT.md` | Termos de produto |
 
 ## Ordem de leitura

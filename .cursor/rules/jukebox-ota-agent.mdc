@@ -12,6 +12,7 @@ alwaysApply: true
 - **Obsidian**: vault pai `C:\GitHub\jukebox\`; wiki `[[NOME]]`; não duplicar notas entre repos.
 - **Runbook**: ler `.cursor/napkin.md` no início da sessão; skill `napkin`.
 - **Arquitetura**: skill `dotnet-architecting-apps`; testes `dotnet-testing-apps`.
+- **Segurança**: skill global **`insecure-defaults`** (`~/.cursor/skills/`) — **não copiar** no repo. Checklists OTA no napkin e em [[PLANO_SEGURANCA_OTA_PENDENCIAS]].
 - **Scripts**: deploy em `tools/deploy/`; workarounds em `tools/`.
 - **Dependências NuGet**: não adicionar sem pedido explícito do usuário.
 - **Workspace**: `jukeeo-knowledge/jukeeo.code-workspace` (repos irmãos sob a pasta pai).

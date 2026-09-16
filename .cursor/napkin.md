@@ -117,4 +117,4 @@ Runbook curado do **jukebox-ota-agent**. Idioma: **português do Brasil** (nunca
   Faça assim: chave pública **não é segredo** — o risco é troca do PEM ou do binário com root; ver [[PLANO_SEGURANCA_OTA_PENDENCIAS]] §3 (user dedicado, fingerprint embutido, RO rootfs).
 
 - [2026-06-12] **Chaves PEM**
-  Faça assim: chave privada **nunca** no Pi; só `public_key_path` em `/etc/jukeeo/`; não versionar `*.pem` (ver `.gitignore`).
+  Faça assim: chave privada **nunca** no Pi nem no repositório; só `public_key_path` em `/etc/jukeeo/`; não versionar `*.pem` (ver `.gitignore`). Produção: `ota_base_url` HTTPS (não `file://`), manifesto com `signature_b64`, TLS do `HttpClient` ligado, `ota-agent.json` modo `640`. Auditoria fail-open: skill global `insecure-defaults` — **não** copiar para `.cursor/skills/`.
