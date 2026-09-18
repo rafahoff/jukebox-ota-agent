@@ -260,6 +260,6 @@ Mesmo com chave pública trocada localmente, um atacante precisa de um **pacote 
 | `src/Jukebox.Ota.Agent/Infrastructure/ExternalServices/HttpOtaUpdateClient.cs` | Cliente HTTP sem auth |
 | `tools/mock/ota_mock_server.py` | Mock sem autorização |
 | `packaging/systemd/jukebox_ota_agent.service` | Execução oneshot como `jukebox-ota` |
-| `tools/deploy/pi_install_ota.sh` | Cria utilizador de sistema e permissões mínimas |
-| `.cursor/skills/insecure-defaults/SKILL.md` | Checklist de defaults |
+| `tools/deploy/pi_install_ota.sh` | Cria usuário de sistema e permissões mínimas |
+| skill global `insecure-defaults` | Auditoria fail-open; checklist OTA no napkin e neste plano |
 | `docs/API.md` | Contrato `/v1/updates/check` |

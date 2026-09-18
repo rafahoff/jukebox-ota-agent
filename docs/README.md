@@ -25,3 +25,4 @@ jukeeo-knowledge/docs/brainstorm/  →  docs/plans/  →  docs/plans/archive/
 | `dotnet-architecting-apps` | Camadas Domain/Application/Infrastructure |
 | `dotnet-testing-apps` | xUnit e testes de integração |
 | `obsidian` (global) | Wiki links `[[NOME]]` |
+| `insecure-defaults` (global) | Fail-secure em config/deploy; **não copiar** no repo |

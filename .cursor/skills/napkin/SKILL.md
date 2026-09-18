@@ -29,3 +29,4 @@ Criar em `docs/plans/`; concluídos em `docs/plans/archive/`. Brainstorm de prod
 
 - Backlog de features do kiosk (`jukebox_tv/TODO.MD`)
 - Duplicar [[PLANO_JUKEBOX_OTA_AGENT_DOTNET_POC]] inteiro
+- Copiar skills globais (`obsidian`, `agent-handoff`, `insecure-defaults`) para `.cursor/skills/`
