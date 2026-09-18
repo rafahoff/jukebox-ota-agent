@@ -23,6 +23,7 @@ OTA_USER="jukebox-ota"
 OTA_GROUP="jukebox-ota"
 STATE_DIR="/var/lib/jukebox-ota"
 JUKEEO_ROOT="/opt/jukeeo"
+STREAMER_OTA_ROOT="/opt/jukeeo/streamer-ota"
 KIOSK_SERVICE="jukeeo_kiosk_flutterpi.service"
 KIOSK_USER="jukebox"
 SYSTEMCTL_SUDOERS_TEMPLATE="jukebox-ota-systemctl.template"
@@ -154,6 +155,61 @@ apply_jukeeo_ota_layout_permissions() {
     chgrp "${OTA_GROUP}" "$JUKEEO_ROOT" 2>/dev/null || true
     chmod g+w "$JUKEEO_ROOT" 2>/dev/null || true
   fi
+}
+
+apply_streamer_ota_layout_permissions() {
+  log "Permissões OTA streamer em ${STREAMER_OTA_ROOT} (grupo ${OTA_GROUP})..."
+  local sub target
+  for sub in "" releases backups; do
+    target="${STREAMER_OTA_ROOT}"
+    [[ -n "$sub" ]] && target="${STREAMER_OTA_ROOT}/${sub}"
+    mkdir -p "$target"
+    chown "root:${OTA_GROUP}" "$target"
+    chmod 2775 "$target"
+  done
+  if [[ -d "${STREAMER_OTA_ROOT}/releases" ]]; then
+    find "${STREAMER_OTA_ROOT}/releases" -mindepth 1 -type d -exec chown "root:${OTA_GROUP}" {} + 2>/dev/null || true
+    find "${STREAMER_OTA_ROOT}/releases" -type d -exec chmod 2775 {} + 2>/dev/null || true
+    find "${STREAMER_OTA_ROOT}/releases" -type f \( -name 'jukeeo-streamer' -o -name 'jukeeo-kiosk-display' \) \
+      -exec chmod 755 {} + 2>/dev/null || true
+  fi
+}
+
+ensure_zstd_package() {
+  if command -v zstd >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if command -v apt-get >/dev/null 2>&1; then
+    log "Instalando zstd (extract dos pacotes OTA .tar.zst)..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq zstd || \
+      log "AVISO: falha ao instalar zstd — apply OTA pode falhar"
+  else
+    log "AVISO: zstd ausente e apt-get indisponível — instale zstd manualmente"
+  fi
+}
+
+apply_jukeeo_etc_jukebox_read_acl() {
+  ensure_acl_package
+
+  if ! command -v setfacl >/dev/null 2>&1; then
+    log "AVISO: setfacl ainda indisponível — jukebox pode não ler streamer.json em /etc/jukeeo"
+    return 0
+  fi
+
+  log "ACL de leitura ${KIOSK_USER} em /etc/jukeeo..."
+  setfacl -m "u:${KIOSK_USER}:rx" /etc/jukeeo 2>/dev/null || \
+    log "AVISO: setfacl em /etc/jukeeo falhou — verificar leitura de streamer.json"
+}
+
+is_streamer_ota_profile() {
+  if [[ -f "$CONFIG_PATH" ]] && grep -q '"app"[[:space:]]*:[[:space:]]*"jukeeo-streamer"' "$CONFIG_PATH"; then
+    return 0
+  fi
+  if [[ -f "$CONFIG_TEMPLATE" ]] && grep -q '"app"[[:space:]]*:[[:space:]]*"jukeeo-streamer"' "$CONFIG_TEMPLATE"; then
+    return 0
+  fi
+  return 1
 }
 
 ensure_acl_package() {
@@ -421,6 +477,7 @@ BINARY_NAME="jukebox-ota-agent"
 
 ensure_ota_user
 ensure_state_downloads_layout
+ensure_zstd_package
 
 ensure_kiosk_user_in_ota_group
 
@@ -430,7 +487,11 @@ cp -a "${ARTIFACTS_DIR}/." "${INSTALL_DIR}/"
 chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
 apply_install_permissions
 
-apply_jukeeo_ota_layout_permissions
+if is_streamer_ota_profile; then
+  apply_streamer_ota_layout_permissions
+else
+  apply_jukeeo_ota_layout_permissions
+fi
 apply_kiosk_data_read_acl
 apply_kiosk_logs_write_acl
 apply_kiosk_ota_status_write_acl
@@ -465,6 +526,12 @@ if [[ -f "$CONFIG_PATH" ]]; then
 fi
 
 apply_install_permissions
+if is_streamer_ota_profile; then
+  apply_streamer_ota_layout_permissions
+else
+  apply_jukeeo_ota_layout_permissions
+fi
+apply_jukeeo_etc_jukebox_read_acl
 ensure_state_downloads_layout
 
 log "Recarregando systemd..."

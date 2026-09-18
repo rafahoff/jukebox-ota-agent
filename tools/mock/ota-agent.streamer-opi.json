@@ -4,7 +4,7 @@
   "channel": "streamer-beta",
   "arch": "aarch64",
   "ota_base_url": "https://ota.jukeeo.com",
-  "current_version": "0.6.19",
+  "current_version": "0.0.0",
   "public_key_path": "/etc/jukeeo/ota-public-key.pem",
   "stop_services": [
     "jukeeo-kiosk-display.service",
