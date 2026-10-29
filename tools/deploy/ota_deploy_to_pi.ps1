@@ -22,7 +22,9 @@ param(
 
     [switch]$EnableTimer,
 
-    [switch]$ForceConfig
+    [switch]$ForceConfig,
+
+    [switch]$UseWslRsync
 )
 
 $ErrorActionPreference = "Stop"
@@ -152,7 +154,27 @@ Set-UnixLineEndings @(
 $useWsl = Test-WslAvailable
 $transferOk = $false
 
-if ($useWsl) {
+function Invoke-StagingTransferScp {
+    Write-Host "Transferindo via scp nativo..." -ForegroundColor Cyan
+    ssh "${PiUser}@${PiHost}" "rm -rf '$RemoteStaging' && mkdir -p '$RemoteStaging'"
+    if ($LASTEXITCODE -ne 0) {
+        throw "SSH falhou ao preparar $RemoteStaging"
+    }
+    Invoke-ScpRecursive -LocalPath "$StagingDir\*" -RemoteDest "$RemoteStaging/"
+}
+
+# scp primeiro (rsync WSL pode travar em NetBird/latência alta sem exit code)
+if (-not $UseWslRsync) {
+    try {
+        Invoke-StagingTransferScp
+        $transferOk = $true
+    } catch {
+        Write-Host "AVISO: scp nativo falhou — tentando WSL + rsync..." -ForegroundColor Yellow
+        Write-Host "  $($_.Exception.Message)" -ForegroundColor Gray
+    }
+}
+
+if (-not $transferOk -and $useWsl) {
     Write-Host "Transferindo via WSL + rsync..." -ForegroundColor Cyan
     $wslStaging = ToWslPath $StagingDir
     $wslRsyncScript = ToWslPath $RsyncScript
@@ -166,19 +188,13 @@ if ($useWsl) {
 }
 
 if (-not $transferOk) {
-    Write-Host "Transferindo via scp nativo..." -ForegroundColor Cyan
-    ssh "${PiUser}@${PiHost}" "rm -rf '$RemoteStaging' && mkdir -p '$RemoteStaging'"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERRO: SSH falhou. Verifique chave e conectividade." -ForegroundColor Red
-        exit 1
-    }
     try {
-        Invoke-ScpRecursive -LocalPath "$StagingDir\*" -RemoteDest "$RemoteStaging/"
+        Invoke-StagingTransferScp
         $transferOk = $true
     } catch {
         Write-Host "ERRO: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host "Dicas:" -ForegroundColor Gray
-        Write-Host "  - WSL: apt install rsync; copiar chave SSH para ~/.ssh no WSL" -ForegroundColor Gray
+        Write-Host "  - WSL: apt install rsync; copiar chave SSH para ~/.ssh no WSL (-UseWslRsync)" -ForegroundColor Gray
         Write-Host "  - Windows: instalar OpenSSH Client (scp/ssh)" -ForegroundColor Gray
         exit 1
     }
