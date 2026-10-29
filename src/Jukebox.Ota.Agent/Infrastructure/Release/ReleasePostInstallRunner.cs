@@ -22,6 +22,8 @@ public sealed class ReleasePostInstallRunner
             throw new FileNotFoundException($"Script pós-install não encontrado: {scriptPath}");
         }
 
+        ReleasePackageLineEndings.NormalizeUnixScripts(releaseDirectory, scriptPath);
+
         var psi = new ProcessStartInfo
         {
             FileName = "/bin/bash",

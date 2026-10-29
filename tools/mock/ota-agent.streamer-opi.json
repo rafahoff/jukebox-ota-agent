@@ -22,6 +22,8 @@
   "current_symlink": "/opt/jukeeo/streamer-ota/current",
   "previous_symlink": "/opt/jukeeo/streamer-ota/previous",
   "install_root_symlink": "/opt/jukeeo/streamer",
+  "cli_symlink_path": "/usr/local/bin/jukeeo-streamer",
+  "cli_symlink_binary": "jukeeo-streamer",
   "backups_dir": "/opt/jukeeo/streamer-ota/backups",
   "health_url": "http://127.0.0.1:8081/health",
   "health_timeout_seconds": 120,
