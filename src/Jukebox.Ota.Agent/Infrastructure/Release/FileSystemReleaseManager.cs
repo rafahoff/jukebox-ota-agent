@@ -110,7 +110,28 @@ public sealed class FileSystemReleaseManager : IReleaseManager
         }
 
         ReplaceSymlink(config.InstallRootSymlink, currentTarget);
+        SyncCliSymlinkIfConfigured(config, currentTarget);
         return Task.CompletedTask;
+    }
+
+    private static void SyncCliSymlinkIfConfigured(OtaAgentConfig config, string currentReleaseDir)
+    {
+        if (string.IsNullOrWhiteSpace(config.CliSymlinkPath))
+        {
+            return;
+        }
+
+        var binaryName = string.IsNullOrWhiteSpace(config.CliSymlinkBinary)
+            ? "jukeeo-streamer"
+            : config.CliSymlinkBinary.Trim();
+        var binaryPath = Path.Combine(currentReleaseDir, binaryName);
+        if (!File.Exists(binaryPath))
+        {
+            throw new FileNotFoundException(
+                $"Binário CLI ausente na release (cli_symlink): {binaryPath}");
+        }
+
+        ReplaceSymlink(config.CliSymlinkPath, binaryPath);
     }
 
     public string? GetCurrentReleaseDirectory(OtaAgentConfig config) =>
@@ -164,6 +185,12 @@ public sealed class FileSystemReleaseManager : IReleaseManager
         else if (Directory.Exists(symlinkPath))
         {
             Directory.Delete(symlinkPath);
+        }
+
+        if (File.Exists(targetPath))
+        {
+            File.CreateSymbolicLink(symlinkPath, targetPath);
+            return;
         }
 
         Directory.CreateSymbolicLink(symlinkPath, targetPath);

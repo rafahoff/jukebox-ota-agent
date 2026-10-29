@@ -17,6 +17,8 @@ public sealed record OtaAgentConfig(
     string CurrentSymlink = "/opt/jukeeo/current",
     string PreviousSymlink = "/opt/jukeeo/previous",
     string? InstallRootSymlink = null,
+    string? CliSymlinkPath = null,
+    string? CliSymlinkBinary = null,
     string BackupsDir = "/opt/jukeeo/backups",
     string HealthUrl = "http://127.0.0.1:8080/api/health",
     int HealthTimeoutSeconds = 90,

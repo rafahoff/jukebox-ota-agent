@@ -40,6 +40,8 @@ public sealed class JsonConfigLoader
             dto.CurrentSymlink ?? "/opt/jukeeo/current",
             dto.PreviousSymlink ?? "/opt/jukeeo/previous",
             dto.InstallRootSymlink,
+            dto.CliSymlinkPath,
+            dto.CliSymlinkBinary,
             dto.BackupsDir ?? "/opt/jukeeo/backups",
             dto.HealthUrl ?? "http://127.0.0.1:8080/api/health",
             dto.HealthTimeoutSeconds ?? 90,
@@ -143,6 +145,12 @@ public sealed class JsonConfigLoader
 
         [JsonPropertyName("install_root_symlink")]
         public string? InstallRootSymlink { get; set; }
+
+        [JsonPropertyName("cli_symlink_path")]
+        public string? CliSymlinkPath { get; set; }
+
+        [JsonPropertyName("cli_symlink_binary")]
+        public string? CliSymlinkBinary { get; set; }
 
         [JsonPropertyName("backups_dir")]
         public string? BackupsDir { get; set; }
